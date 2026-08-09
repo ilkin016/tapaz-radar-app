@@ -1,0 +1,50 @@
+{
+  "_comment": "Buraya izlemek istediyin kateqoriyalari elave et. category_id-ni tapaz kateqoriya sehifesinden avtomatik oxumaq ucun run.py --add <url> istifade et, ve ya elle daxil et.",
+  "categories": [
+    {
+      "name": "Noutbuklar",
+      "slug": "noutbuklar",
+      "url": "https://tap.az/elanlar/elektronika/noutbuklar",
+      "category_id": "Z2lkOi8vdGFwL0NhdGVnb3J5LzYxNw",
+      "enabled": true,
+      "filters": {"price_from": null, "price_to": null, "only_new": false},
+      "enrich": true
+    },
+    {
+      "name": "Komputerlər (masaüstü)",
+      "slug": "komputerler",
+      "url": "https://tap.az/elanlar/elektronika/komputerler",
+      "category_id": "Z2lkOi8vdGFwL0NhdGVnb3J5LzYxNA",
+      "enabled": true,
+      "filters": {"price_from": null, "price_to": null, "only_new": false},
+      "enrich": true
+    },
+    {
+      "name": "Komponentlər və monitorlar",
+      "slug": "komputer-avadanliqi",
+      "url": "https://tap.az/elanlar/elektronika/komputer-avadanliqi",
+      "category_id": "Z2lkOi8vdGFwL0NhdGVnb3J5LzYxNQ",
+      "enabled": true,
+      "filters": {"price_from": null, "price_to": null, "only_new": false},
+      "enrich": true
+    },
+    {
+      "name": "Komputer aksesuarları",
+      "slug": "komputer-aksesuarlari",
+      "url": "https://tap.az/elanlar/elektronika/komputer-aksesuarlari",
+      "category_id": "Z2lkOi8vdGFwL0NhdGVnb3J5LzYxMg",
+      "enabled": true,
+      "filters": {"price_from": null, "price_to": null, "only_new": false},
+      "enrich": true
+    },
+    {
+      "name": "Ofis avadanlığı",
+      "slug": "ofis-avadanliqi",
+      "url": "https://tap.az/elanlar/elektronika/ofis-avadanliqi",
+      "category_id": "Z2lkOi8vdGFwL0NhdGVnb3J5LzYxOA",
+      "enabled": true,
+      "filters": {"price_from": null, "price_to": null, "only_new": false},
+      "enrich": true
+    }
+  ]
+}

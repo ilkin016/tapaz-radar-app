@@ -1,0 +1,12 @@
+[Unit]
+Description=tap.az Radar - gundelik skan
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=radar
+WorkingDirectory=/opt/tapaz-radar
+ExecStart=/usr/bin/python3 /opt/tapaz-radar/run.py
+# Excel hesabati ucun: pip3 install openpyxl (bir defelik)
+TimeoutStartSec=3600
