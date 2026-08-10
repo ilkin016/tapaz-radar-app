@@ -1,6 +1,11 @@
 # tap.az Radar — Cari Vəziyyət
 
-**Son yenilənmə:** 2026-08-10 (session: alt-kateqoriya analizi + pagination + dizayn v2; əvvəl interaktiv İcmal + parametr filtrləri + 100% əhatə)
+**Son yenilənmə:** 2026-08-10 (v3: qiymət 200₼ interval + CPU nəsil/seriya filtri + büdcə siyahıları İcmaldan alt-kateqoriya analizinə; əvvəl v2: alt-kat analizi + pagination + dizayn)
+
+## 🆕 Ən son (v3)
+- **Qiymət aralığı intervalları 200₼** oldu (İcmal qrafiki + alt-kat analizi cədvəlləri) — `band200(price)`.
+- **CPU Nəsil + Seriya filtri** (yalnız noutbuk/masaüstü): Apple M1-4, Intel N-ci nəsil, Core Ultra Seriya, Ryzen N000; suffix U/H/HX/HS/HK/HQ/G/K/F/T/P/Y/M/MQ/QM. `cpuGen`/`cpuSer` cpu mətnindən parse+keş, `VALID_SUF` whitelist. Test: Intel 13-cü+HX → 148 (i7-13650HX).
+- **«Büdcəyə görə ən yaxşı» + «parametrə görə ən ucuz» İcmaldan SİLİNDİ** — istifadəçi tələbi ilə artıq yalnız hər kateqoriyanın «Alt-kateqoriya analizi» tabında (hər alt-kat ayrı). İcmalda yönləndirici hint qaldı → İcmal indi kompakt (KPI + kart + 4 qrafik).
 
 ---
 

@@ -103,3 +103,12 @@
 - **Qərar (pagination):** Cədvəl səhifələnir (`state.ps` 25/50/100/200, `state.page`), əvvəlki "ilk 400" limiti əvəzinə. Filtr/sort/axtarış/kateqoriya dəyişəndə `page=0`.
 - **Toxunulan:** `radar/report_html.py` (`catAnalysis`/`bestBandsFor`/`relevantParams`/`compKey`/`cheapestByComp`/`COMP_JUNK`; `pager`/`bindPager`; `bindSubtabs`; `state.page/ps/catTab`; `filtered(base,skipSub)`).
 - **⚠️** `compKey` monitor ölçüsünü YALNIZ `params`-dan oxu (name-dəki dırnaq artefaktı). Komponent skorları `spec_score`-a əsaslanır — komponent enrichment-i dəyişsən analiz də dəyişər.
+
+## 2026-08-10 · Qiymət 200₼ interval + CPU nəsil/seriya + büdcə siyahıları İcmaldan çıxarıldı
+
+- **Qərar (İcmal təmizliyi):** «Büdcəyə görə ən yaxşı parametrlər» + «parametrə görə ən ucuz məhsullar» İcmaldan (`render1` overview) SİLİNDİ. Global qarışıq (noutbuk+SSD+monitor bir cədvəldə) yanıldıcı idi. Bunlar artıq hər kateqoriyanın «Alt-kateqoriya analizi» tabında, hər alt-kateqoriya ayrıca. İcmalda yönləndirici hint qaldı.
+- **Səbəb:** İstifadəçi: "burda hər birini öz kateqoriyası və alt-kateqoriyası altında göstərmək lazımdır, İcmalda yox".
+- **Qərar (200₼ interval):** Qiymət qrafiki və bütün band-cədvəlləri 100₼ `band` sahəsi əvəzinə `band200(price)` işlədir (0–200, 200–400, … 2000+). İstifadəçi: "intervallar 200 azn səviyyəsində olmalıdır".
+- **Qərar (CPU nəsil/seriya):** `cpu_fam` (ailə) filtrinə əlavə **Nəsil** (`cpuGen`) + **Seriya** (`cpuSer`) filtrləri. `cpu` mətnindən regex-lə parse, hər sətirdə `r.__cg/__cs` keşlənir. Intel köhnə i5-13420H → nəsil="model rəqəminin ilk 1-2 rəqəmi" (5 rəqəm→2, 4 rəqəm 1-lə başlayır→2, yoxsa→1); Intel yeni "Core 7 155U"→Ultra Seriya; Ryzen "9955HX"→9000; Apple M4. Suffix `VALID_SUF` whitelist ilə təmizlənir (GB/UU/SS mis-parse atılır). `distinctFn`/`pselFn` hesablanmış dəyər dropdown-ları.
+- **Toxunulan:** `radar/report_html.py` (`band200`, `bandDist`, `bestBandsFor`; `_cpuCompute`/`cpuGen`/`cpuSer`/`VALID_SUF`/`distinctFn`/`pselFn`; `state.pcgen/pcser`; overview render sadələşdirildi — `bestPerBand`/`cheapestPerParam` silindi).
+- **⚠️** Nəsil/seriya YALNIZ `cpu` sahəsi dolu olan kateqoriyalarda (noutbuk/masaüstü) görünür — komponentlərdə boşdur, dropdown çıxmır. Suffix whitelist-ə yeni real suffix (məs. Ryzen XT) lazım olsa `VALID_SUF`-a əlavə et.
