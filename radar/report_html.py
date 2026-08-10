@@ -176,7 +176,7 @@ let STAR=store.get();
 $('#brsub').textContent=`${META.n_total} elan · ${META.n_new} 🆕 · ${META.run_ts.slice(0,10)}`;
 
 const state={view:'overview',cat:'',sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,q:'',
- pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1,page:0,ps:50,catTab:'table',bandPages:{},paramTab:'ram',condMode:'yeni'};
+ pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1,page:0,ps:50,catTab:'table',bandPages:{},paramTab:'ram',condMode:'yeni',budgetSub:''};
 function distinct(field,cat){const s=new Set();DATA.forEach(r=>{if(cat&&r.category!==cat)return;const v=r[field];if(v!=null&&v!=='')s.add(v);});return [...s];}
 
 // ---------- navigation ----------
@@ -288,7 +288,7 @@ function bindTable(){
  $('#root').querySelectorAll('.star').forEach(s=>s.onclick=()=>{const id=s.dataset.id;
   if(STAR.has(id))STAR.delete(id);else STAR.add(id);store.set(STAR);render();});
 }
-function filtersBar(withCat,hideCond){
+function filtersBar(withCat,hideCond,hideSub){
  const subs=(state.cat&&META.subs[state.cat])||[];
  const cat=state.cat;
  const psel=(id,field,label,cur,numeric,suffix='')=>{let vals=distinct(field,cat);if(!vals.length)return '';
@@ -310,7 +310,7 @@ function filtersBar(withCat,hideCond){
  </div>`;
  return `<div class="controls">
   ${withCat?`<select id="f_cat"><option value="">Kateqoriya: hamısı</option>${META.cats.map(c=>`<option value="${c.slug}" ${state.cat===c.slug?'selected':''}>${c.label}</option>`).join('')}</select>`:''}
-  ${subs.length?`<select id="f_sub"><option value="">Alt-kateqoriya: hamısı</option>${subs.map(s=>`<option ${state.sub===s?'selected':''}>${esc(s)}</option>`).join('')}</select>`:''}
+  ${hideSub||!subs.length?'':`<select id="f_sub"><option value="">Alt-kateqoriya: hamısı</option>${subs.map(s=>`<option ${state.sub===s?'selected':''}>${esc(s)}</option>`).join('')}</select>`}
   <select id="f_usage"><option value="">İstifadə</option><option>Gaming</option><option>Ofis / Gündəlik</option></select>
   ${hideCond?'':`<select id="f_cond"><option value="">Vəziyyət</option><option>Yeni</option><option>İkinci əl</option></select>`}
   <select id="f_seller"><option value="">Satıcı</option><option>Mağaza</option><option>Şəxsi</option></select>
@@ -478,14 +478,27 @@ function catAnalysis(cat){
 }
 // Budget browser — each 200₼ range as its own paginated panel. Defaults to «Yeni» condition (used → Vəziyyət filter).
 function budgetView(cat){
- const sig=JSON.stringify(['B',state.condMode,state.cat,state.sub,state.seller,state.usage,state.brand,state.pmin,state.pmax,state.onlyNew,state.pram,state.pcpu,state.pcgen,state.pcser,state.pstor,state.pscr,state.pgpu,state.q,state.sortKey,state.sortDir]);
+ const subsAll=META.subs[cat]||[];
+ let base=applyCondMode(filtered(DATA,true,true).filter(r=>+r.price>=1)); // sub+cond burada idarə olunur; <1₼ = metrlə kabel küy
+ // Alt-kateqoriya ayrımı — çox-alt-kateqoriyalı kateqoriyalarda (məs. Komponent/Monitor) hər alt-kat AYRICA
+ let subSel='',bsub=state.budgetSub;
+ if(subsAll.length>1){
+  const cnt={};base.forEach(r=>{const s=r.subcategory||'Digər';cnt[s]=(cnt[s]||0)+1;});
+  const ord=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);
+  if(bsub!=='__all'&&!ord.includes(bsub))bsub=ord[0]; // default: ən böyük alt-kateqoriya (qarışıq deyil)
+  subSel=`<div class="panel" style="padding:11px 14px;margin-bottom:12px"><div class="controls" style="margin:0"><span class="small" style="align-self:center;font-weight:700">📂 Alt-kateqoriya:</span>`
+   +`<button class="chip ${bsub==='__all'?'on':''}" data-bs="__all">🔀 Hamısı</button>`
+   +ord.map(s=>`<button class="chip ${bsub===s?'on':''}" data-bs="${esc(s)}">${esc(s)} <span class="small">${cnt[s]}</span></button>`).join('')
+   +`</div></div>`;
+  if(bsub!=='__all')base=base.filter(r=>(r.subcategory||'Digər')===bsub);
+ }
+ const sig=JSON.stringify(['B',state.condMode,bsub,state.cat,state.seller,state.usage,state.brand,state.pmin,state.pmax,state.onlyNew,state.pram,state.pcpu,state.pcgen,state.pcser,state.pstor,state.pscr,state.pgpu,state.q,state.sortKey,state.sortDir]);
  if(state._bsig!==sig){state.bandPages={};state._bsig=sig;}
- let base=applyCondMode(filtered(DATA,!state.sub,true).filter(r=>+r.price>=1)); // <1₼ = metrlə kabel və s. küy
  const scoredCat=base.some(r=>r.value_score!=null); // laptop/desktop/spec'd komponent → keyfiyyət filtri; aksesuar/ofis → hamısı
  if(scoredCat)base=base.filter(r=>r.value_score!=null);
  const g={};base.forEach(r=>{const b=band200(r.price);if(!b)return;(g[b]=g[b]||[]).push(r);});
  const bands=Object.keys(g).sort((a,b)=>(a==='2000+'?1e9:parseInt(a))-(b==='2000+'?1e9:parseInt(b)));
- const note=`<div class="panel" style="padding:12px 14px;margin-bottom:12px">${condModeBar()}<span class="small">💡 Yuxarıdan vəziyyət seç: <b>Yalnız Yeni</b>, <b>Yeni + İkinci əl</b> (qarışıq) və ya <b>Yalnız İkinci əl</b>. Hər qiymət aralığı ayrıca səhifələnir.</span></div>`;
+ const note=subSel+`<div class="panel" style="padding:12px 14px;margin-bottom:12px">${condModeBar()}<span class="small">💡 Alt-kateqoriya + vəziyyət seç: <b>Yalnız Yeni</b> / <b>Yeni + İkinci əl</b> (qarışıq) / <b>Yalnız İkinci əl</b>. Hər qiymət aralığı ayrıca səhifələnir.</span></div>`;
  if(!bands.length)return note+'<div class="panel muted">Bu seçim üçün məhsul yoxdur.</div>';
  const maxSpec=Math.max(1,...base.map(r=>r.spec_score||0));
  const PS=15;
@@ -571,6 +584,7 @@ function condModeBar(){return `<div class="controls" style="margin-bottom:0"><sp
   <button class="chip ${state.condMode==='used'?'on':''}" data-cm="used">♻️ Yalnız İkinci əl</button></div>`;}
 function applyCondMode(rows){return state.condMode==='yeni'?rows.filter(r=>r.condition==='Yeni'):(state.condMode==='used'?rows.filter(r=>r.condition==='İkinci əl'):rows);}
 function bindCondMode(){$('#root').querySelectorAll('[data-cm]').forEach(b=>b.onclick=()=>{state.condMode=b.dataset.cm;render();});}
+function bindBudgetSub(){$('#root').querySelectorAll('[data-bs]').forEach(b=>b.onclick=()=>{state.budgetSub=b.dataset.bs;state.bandPages={};render();});}
 function render1(){
  const root=$('#root');const v=state.view;
  let title='İcmal',sub='';
@@ -620,8 +634,8 @@ function render1(){
    bindFilters();bindSubtabs();
   } else if(cm&&state.catTab==='budget'){
    sub=`hər qiymət aralığı ayrıca`;
-   root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true,true)}${tabs}</div>`+budgetView(state.cat);
-   bindFilters();bindSubtabs();bindCondMode();bindBandPagers();
+   root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true,true,true)}${tabs}</div>`+budgetView(state.cat);
+   bindFilters();bindSubtabs();bindCondMode();bindBudgetSub();bindBandPagers();
   } else if(cm&&state.catTab==='param'){
    sub=`CPU / RAM / VGA üzrə ən sərfəli qiymət`;
    root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true,true)}${tabs}</div>`+paramView(state.cat);
