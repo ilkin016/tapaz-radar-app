@@ -44,65 +44,90 @@ _TEMPLATE = r"""<!doctype html><html lang="az"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>tap.az Radar — __RUNTS__</title>
 <style>
-:root{--bg:#eef2f7;--panel:#fff;--ink:#111827;--muted:#6b7280;--line:#e3e8ef;--acc:#1f4e79;--acc2:#2563eb;
- --good:#15803d;--bad:#b91c1c;--warn:#b45309;--chip:#f1f5f9}
-@media(prefers-color-scheme:dark){:root{--bg:#0b1220;--panel:#111a29;--ink:#e5edf6;--muted:#93a1b3;--line:#1f2c3f;
- --acc:#5b9bd5;--acc2:#60a5fa;--chip:#182234}}
+:root{--bg:#f3f6fb;--panel:#ffffff;--panel2:#f7f9fd;--ink:#0f172a;--muted:#64748b;--line:#e6ecf5;--acc:#1d4ed8;--acc2:#2563eb;
+ --acc-soft:#e9f0fe;--good:#15803d;--bad:#b91c1c;--warn:#b45309;--chip:#eef2f9;
+ --shadow:0 1px 2px rgba(15,23,42,.05),0 2px 8px rgba(15,23,42,.05);--radius:14px}
+@media(prefers-color-scheme:dark){:root{--bg:#070c15;--panel:#0f1826;--panel2:#0c1421;--ink:#e6eef8;--muted:#8aa0b8;--line:#1d2b3f;
+ --acc:#3b82f6;--acc2:#60a5fa;--acc-soft:#14243a;--chip:#152131;
+ --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.4)}}
 *{box-sizing:border-box}html,body{margin:0;height:100%}
-body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
-.app{display:grid;grid-template-columns:210px 1fr;height:100vh}
-.side{background:var(--panel);border-right:1px solid var(--line);padding:14px 10px;overflow:auto}
-.brand{font-weight:800;font-size:15px;padding:6px 8px 12px;letter-spacing:.2px}
-.brand small{display:block;color:var(--muted);font-weight:500;font-size:11px;margin-top:2px}
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:13px;-webkit-font-smoothing:antialiased}
+.app{display:grid;grid-template-columns:224px 1fr;height:100vh}
+.side{background:var(--panel);border-right:1px solid var(--line);padding:16px 12px;overflow:auto}
+.brand{font-weight:800;font-size:15px;padding:4px 8px 14px;letter-spacing:.3px}
+.brand .logo{display:flex;align-items:center;gap:8px}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--acc2);box-shadow:0 0 0 3px var(--acc-soft)}
+.brand small{display:block;color:var(--muted);font-weight:500;font-size:11px;margin-top:6px;letter-spacing:0}
 .nav{display:flex;flex-direction:column;gap:2px}
-.nav button{all:unset;cursor:pointer;padding:9px 10px;border-radius:8px;color:var(--ink);font-size:13px;display:flex;justify-content:space-between;align-items:center}
-.nav button:hover{background:var(--chip)}.nav button.on{background:var(--acc);color:#fff}
-.nav .cnt{font-size:11px;opacity:.7}
-.nav .sep{margin:8px 6px 4px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.08em}
-.main{overflow:auto;padding:16px 18px}
-.top{display:flex;gap:12px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
-.top h1{font-size:18px;margin:0}.top .sub{color:var(--muted);font-size:12px}
-.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
-@media(max-width:900px){.kpis{grid-template-columns:repeat(3,1fr)}.app{grid-template-columns:1fr}.side{position:fixed;z-index:9;height:100%;transform:translateX(-100%);transition:.2s}.side.open{transform:none}}
-.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
-.kpi .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
-.kpi .n{font-size:22px;font-weight:800;margin-top:3px}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:16px}
-.panel h2{font-size:14px;margin:0 0 10px}
+.nav button{all:unset;cursor:pointer;padding:9px 11px;border-radius:9px;color:var(--ink);font-size:13px;display:flex;justify-content:space-between;align-items:center;transition:background .12s}
+.nav button:hover{background:var(--chip)}.nav button.on{background:var(--acc2);color:#fff;box-shadow:var(--shadow)}
+.nav button.on .cnt{color:#fff;opacity:.9}
+.nav .cnt{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.nav .sep{margin:12px 8px 4px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.1em;font-weight:700}
+.main{overflow:auto;padding:18px 22px}
+.top{display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.top h1{font-size:19px;margin:0;font-weight:800;letter-spacing:-.3px}.top .sub{color:var(--muted);font-size:12px}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:11px;margin-bottom:18px}
+@media(max-width:1050px){.kpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:900px){.app{grid-template-columns:1fr}.side{position:fixed;z-index:20;height:100%;transform:translateX(-100%);transition:.2s;box-shadow:var(--shadow)}.side.open{transform:none}}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 13px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--acc2);opacity:.85}
+.kpi .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.kpi .n{font-size:22px;font-weight:800;margin-top:3px;letter-spacing:-.5px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin-bottom:16px;box-shadow:var(--shadow)}
+.panel h2{font-size:14px;margin:0 0 12px;font-weight:750;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.panel h3{font-size:12px;margin:2px 0 8px;font-weight:700;color:var(--muted)}
 .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
-input,select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink);font-size:12.5px}
-input:focus,select:focus{outline:2px solid var(--acc2);border-color:transparent}
-.qs{display:flex;gap:4px;flex-wrap:wrap}
-.qs button,.chip{all:unset;cursor:pointer;padding:6px 10px;border:1px solid var(--line);border-radius:20px;font-size:12px;background:var(--chip)}
+input,select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink);font-size:12.5px;transition:border-color .12s,box-shadow .12s}
+input:focus,select:focus{outline:none;border-color:var(--acc2);box-shadow:0 0 0 3px var(--acc-soft)}
+select{cursor:pointer}
+.qs{display:flex;gap:5px;flex-wrap:wrap}
+.qs button,.chip{all:unset;cursor:pointer;padding:7px 11px;border:1px solid var(--line);border-radius:20px;font-size:12px;background:var(--panel);transition:.12s}
+.qs button:hover,.chip:hover{border-color:var(--acc2)}
 .qs button.on,.chip.on{background:var(--acc2);color:#fff;border-color:transparent}
+.subtabs{display:flex;gap:4px;margin:2px 0 14px;border-bottom:1px solid var(--line)}
+.stab{all:unset;cursor:pointer;padding:9px 15px;font-size:12.5px;font-weight:650;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;transition:.12s}
+.stab:hover{color:var(--ink)}.stab.on{color:var(--acc2);border-bottom-color:var(--acc2)}
 table{width:100%;border-collapse:collapse}
-th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-th{position:sticky;top:0;background:var(--panel);cursor:pointer;user-select:none;font-size:10.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+th,td{padding:8px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{position:sticky;top:0;z-index:2;background:var(--panel2);cursor:pointer;user-select:none;font-size:10.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap;font-weight:700;letter-spacing:.03em;box-shadow:inset 0 -1px 0 var(--line)}
+th:hover{color:var(--acc2)}
 th.arrow::after{content:' ▾';color:var(--acc2)}th.arrowup::after{content:' ▴';color:var(--acc2)}
+tbody tr{transition:background .08s}
+tbody tr:nth-child(even){background:var(--panel2)}
+tbody tr:hover{background:var(--acc-soft)}
 td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .small{color:var(--muted);font-size:11.5px}
-.val{font-weight:800;padding:2px 6px;border-radius:6px;color:#fff;display:inline-block;min-width:34px;text-align:center}
+.val{font-weight:800;padding:2px 7px;border-radius:6px;color:#fff;display:inline-block;min-width:34px;text-align:center;font-variant-numeric:tabular-nums}
 .shop{color:var(--good);font-weight:600}.priv{color:var(--warn);font-weight:600}
-.tg{border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700}
+.tg{border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;white-space:nowrap}
 .tg.new{background:#dcfce7;color:#15803d}.tg.g{background:#f3e8ff;color:#7e22ce}.tg.o{background:#dbeafe;color:#1d4ed8}
 a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
-.star{cursor:pointer;color:#cbd5e1;font-size:15px}.star.on{color:#f59e0b}
-.tblwrap{max-height:calc(100vh - 250px);overflow:auto;border:1px solid var(--line);border-radius:10px}
-.bars .bar{display:grid;grid-template-columns:120px 1fr 40px;gap:8px;align-items:center;margin:3px 0;font-size:12px}
-.bars .bt{background:var(--chip);border-radius:6px;height:13px;overflow:hidden}.bars .bt i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:6px}
+.star{cursor:pointer;color:#cbd5e1;font-size:15px;transition:transform .1s}.star:hover{transform:scale(1.25)}.star.on{color:#f59e0b}
+.tblwrap{max-height:calc(100vh - 330px);overflow:auto;border:1px solid var(--line);border-radius:11px}
+.bars .bar{display:grid;grid-template-columns:132px 1fr 42px;gap:8px;align-items:center;margin:3px 0;font-size:12px}
+.bars .bt{background:var(--chip);border-radius:6px;height:14px;overflow:hidden}.bars .bt i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:6px;transition:width .3s}
 .bars .bv{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
-.cbar{cursor:pointer;border-radius:7px;padding:2px 5px;transition:background .12s}.cbar:hover{background:var(--chip)}.cbar:hover .bt i{filter:brightness(1.18)}
+.cbar{cursor:pointer;border-radius:7px;padding:3px 6px;margin:1px 0;transition:background .12s}.cbar:hover{background:var(--chip)}.cbar:hover .bt i{filter:brightness(1.15)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
-.catcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
-.catcard{background:linear-gradient(160deg,var(--chip),transparent);border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;transition:transform .12s,border-color .12s,box-shadow .12s}
-.catcard:hover{border-color:var(--acc2);transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.12)}.catcard .b{font-size:24px;font-weight:800;margin:4px 0}
+.catcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px}
+.catcard{background:linear-gradient(160deg,var(--acc-soft),var(--panel));border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;transition:transform .12s,border-color .12s,box-shadow .12s}
+.catcard:hover{border-color:var(--acc2);transform:translateY(-3px);box-shadow:0 10px 24px rgba(37,99,235,.16)}.catcard .b{font-size:25px;font-weight:800;margin:5px 0;letter-spacing:-.5px}
 .muted{color:var(--muted)}.hide{display:none}
 .count{color:var(--muted);font-weight:400;font-size:12px}
+.pager{display:flex;gap:5px;align-items:center;flex-wrap:wrap;padding:12px 2px 2px}
+.pg{all:unset;cursor:pointer;min-width:18px;text-align:center;padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:12px;background:var(--panel);transition:.12s;font-variant-numeric:tabular-nums}
+.pg:hover:not([disabled]){border-color:var(--acc2)}
+.pg.on{background:var(--acc2);color:#fff;border-color:transparent;font-weight:700}
+.pg[disabled]{opacity:.4;cursor:default}
+.pgdots{color:var(--muted);padding:0 2px}
+.pgmeta{color:var(--muted);font-size:11.5px;margin-left:8px}
+.pgsize{margin-left:auto}
 .mtoggle{display:none}@media(max-width:900px){.mtoggle{display:inline-block}}
 </style></head><body>
 <div class="app">
  <aside class="side" id="side">
-  <div class="brand">tap.az RADAR<small id="brsub"></small></div>
+  <div class="brand"><span class="logo"><span class="dot"></span>tap.az RADAR</span><small id="brsub"></small></div>
   <div class="nav" id="nav"></div>
  </aside>
  <div class="main">
@@ -126,7 +151,7 @@ let STAR=store.get();
 $('#brsub').textContent=`${META.n_total} elan · ${META.n_new} 🆕 · ${META.run_ts.slice(0,10)}`;
 
 const state={view:'overview',cat:'',sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,q:'',
- pram:'',pcpu:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1};
+ pram:'',pcpu:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1,page:0,ps:50,catTab:'table'};
 function distinct(field,cat){const s=new Set();DATA.forEach(r=>{if(cat&&r.category!==cat)return;const v=r[field];if(v!=null&&v!=='')s.add(v);});return [...s];}
 
 // ---------- navigation ----------
@@ -143,18 +168,20 @@ function buildNav(){
  });
 }
 function go(k){
- if(k.startsWith('cat:')){state.view='table';state.cat=k.slice(4);state.sub='';}
+ if(k.startsWith('cat:')){state.view='table';state.cat=k.slice(4);state.catTab='table';
+  Object.assign(state,{sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,pram:'',pcpu:'',pstor:'',pscr:'',pgpu:''});}
  else {state.view=k;if(k!=='table')state.cat='';}
+ state.page=0;
  [...$('#nav').children].forEach(b=>b.classList&&b.classList.toggle('on',b.dataset&&b.dataset.k===k));
  render();window.scrollTo(0,0);
 }
 
 // ---------- filtering / sorting ----------
-function filtered(base){
+function filtered(base,skipSub){
  const q=state.q.toLowerCase();
  return base.filter(r=>{
   if(state.cat&&r.category!==state.cat)return false;
-  if(state.sub&&r.subcategory!==state.sub)return false;
+  if(!skipSub&&state.sub&&r.subcategory!==state.sub)return false;
   if(state.cond&&r.condition!==state.cond)return false;
   if(state.seller&&r.seller_type!==state.seller)return false;
   if(state.usage&&r.usage!==state.usage)return false;
@@ -186,7 +213,9 @@ const COLS=[['','',36],['name','Ad',null],['brand','Brend',null],['price','Qiym�
  ['gpu','Video kart',null],['params','Parametrlər',null],['usage','İstifadə',null],['condition','Vəziyyət',null],['seller_type','Satıcı',null],
  ['seller','Mağaza/Şəxs',null],['phones','Telefon',null]];
 function tableHTML(rows){
- const shown=rows.slice(0,400);
+ const ps=state.ps,pages=Math.max(1,Math.ceil(rows.length/ps));
+ if(state.page>=pages)state.page=pages-1;if(state.page<0)state.page=0;
+ const start=state.page*ps,shown=rows.slice(start,start+ps);
  const head='<tr>'+COLS.map(c=>{if(c[0]==='')return '<th></th>';const ar=state.sortKey===c[0]?(state.sortDir<0?'arrow':'arrowup'):'';
   return `<th class="${ar}" data-k="${c[0]}">${c[1]}</th>`;}).join('')+'</tr>';
  const body=shown.map(r=>{
@@ -205,12 +234,30 @@ function tableHTML(rows){
    <td class="${r.seller_type==='Mağaza'?'shop':'priv'}">${esc(r.seller_type)}</td>
    <td class="small">${esc(r.seller)}</td>
    <td class="small">${esc(r.phones)}</td></tr>`;}).join('');
- return `<table><thead>${head}</thead><tbody>${body}</tbody></table>`
-  +(rows.length>400?`<div class="small" style="padding:8px">${rows.length} nəticədən ilk 400 göstərilir — filtrlə daralt.</div>`:'');
+ return `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
+function pager(total){
+ const ps=state.ps,pages=Math.max(1,Math.ceil(total/ps));
+ let p=state.page;if(p>=pages)p=pages-1;if(p<0)p=0;
+ const btn=(lbl,pg,dis,on)=>`<button class="pg ${on?'on':''}" data-pg="${pg}" ${dis?'disabled':''}>${lbl}</button>`;
+ let nums='';const win=2,st=Math.max(0,p-win),en=Math.min(pages-1,p+win);
+ const add=i=>nums+=btn(i+1,i,false,i===p);
+ if(st>0){add(0);if(st>1)nums+='<span class="pgdots">…</span>';}
+ for(let i=st;i<=en;i++)add(i);
+ if(en<pages-1){if(en<pages-2)nums+='<span class="pgdots">…</span>';add(pages-1);}
+ return `<div class="pager">${btn('‹ Əvvəl',p-1,p===0)}${nums}${btn('Sonra ›',p+1,p>=pages-1)}
+  <span class="pgmeta">Səhifə ${p+1} / ${pages} · ${fmt(total)} nəticə</span>
+  <select id="pgsize" class="pgsize">${[25,50,100,200].map(s=>`<option value="${s}" ${s===ps?'selected':''}>${s}/səhifə</option>`).join('')}</select></div>`;
+}
+function bindPager(){
+ $('#root').querySelectorAll('.pg').forEach(b=>{if(b.hasAttribute('disabled'))return;
+  b.onclick=()=>{state.page=+b.dataset.pg;render();const w=$('#root .tblwrap');if(w)w.scrollTop=0;};});
+ const ss=$('#pgsize');if(ss)ss.onchange=()=>{state.ps=+ss.value;state.page=0;render();};
+}
+function bindSubtabs(){$('#root').querySelectorAll('.stab').forEach(b=>b.onclick=()=>{state.catTab=b.dataset.tab;state.page=0;render();window.scrollTo(0,0);});}
 function bindTable(){
  $('#root').querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{const k=th.dataset.k;
-  if(state.sortKey===k)state.sortDir*=-1;else{state.sortKey=k;state.sortDir=(k==='name'||k==='brand'||k==='seller_type')?1:-1;}render();});
+  if(state.sortKey===k)state.sortDir*=-1;else{state.sortKey=k;state.sortDir=(k==='name'||k==='brand'||k==='seller_type')?1:-1;}state.page=0;render();});
  $('#root').querySelectorAll('.star').forEach(s=>s.onclick=()=>{const id=s.dataset.id;
   if(STAR.has(id))STAR.delete(id);else STAR.add(id);store.set(STAR);render();});
 }
@@ -249,17 +296,17 @@ function filtersBar(withCat){
  </div>${paramRow}`;
 }
 function bindFilters(){
- const set=(id,key)=>{const e=$('#'+id);if(e)e.onchange=()=>{state[key]=e.value;
-  if(key==='cat')Object.assign(state,{sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,pram:'',pcpu:'',pstor:'',pscr:'',pgpu:''});render();};};
+ const set=(id,key)=>{const e=$('#'+id);if(e)e.onchange=()=>{state[key]=e.value;state.page=0;
+  if(key==='cat')Object.assign(state,{sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,pram:'',pcpu:'',pstor:'',pscr:'',pgpu:'',catTab:'table'});render();};};
  set('f_cat','cat');set('f_sub','sub');set('f_usage','usage');set('f_cond','cond');set('f_seller','seller');set('f_brand','brand');
  set('f_pram','pram');set('f_pcpu','pcpu');set('f_pstor','pstor');set('f_pscr','pscr');set('f_pgpu','pgpu');
- const pn=$('#f_pmin'),px=$('#f_pmax');if(pn)pn.oninput=()=>{state.pmin=pn.value;render();};if(px)px.oninput=()=>{state.pmax=px.value;render();};
- const fn=$('#f_new');if(fn)fn.onchange=()=>{state.onlyNew=fn.checked;render();};
+ const pn=$('#f_pmin'),px=$('#f_pmax');if(pn)pn.oninput=()=>{state.pmin=pn.value;state.page=0;render();};if(px)px.oninput=()=>{state.pmax=px.value;state.page=0;render();};
+ const fn=$('#f_new');if(fn)fn.onchange=()=>{state.onlyNew=fn.checked;state.page=0;render();};
  $('#root').querySelectorAll('.qs button').forEach(b=>b.onclick=()=>{const s=b.dataset.sort;
   if(s==='price_asc'){state.sortKey='price';state.sortDir=1;}else if(s==='price_desc'){state.sortKey='price';state.sortDir=-1;}
-  else{state.sortKey='value_score';state.sortDir=-1;}render();});
+  else{state.sortKey='value_score';state.sortDir=-1;}state.page=0;render();});
  const cl=$('#f_clear');if(cl)cl.onclick=()=>{Object.assign(state,{sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,
-  pram:'',pcpu:'',pstor:'',pscr:'',pgpu:''});render();};
+  pram:'',pcpu:'',pstor:'',pscr:'',pgpu:'',page:0});render();};
  [['f_usage','usage'],['f_cond','cond'],['f_seller','seller']].forEach(([id,k])=>{const e=$('#'+id);if(e)e.value=state[k];});
 }
 
@@ -300,7 +347,7 @@ function bandDist(scored){const c={};scored.forEach(r=>{if(!r.band)return;let b=
 function cbars(counter,order,fmtk,type,limit){let items=(order||Object.keys(counter).sort((a,b)=>counter[b]-counter[a]));if(limit)items=items.slice(0,limit);
  const mx=Math.max(1,...items.map(k=>counter[k]));
  return '<div class="bars">'+items.map(k=>`<div class="bar cbar" data-type="${type}" data-val="${esc(''+k)}"><span>${esc(fmtk(k))}</span><span class="bt"><i style="width:${Math.round(counter[k]/mx*100)}%"></i></span><span class="bv">${counter[k]}</span></div>`).join('')+'</div>';}
-function pick(type,val){Object.assign(state,{cat:'',sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',pram:'',pcpu:'',pstor:'',pscr:'',pgpu:'',onlyNew:false});
+function pick(type,val){Object.assign(state,{cat:'',sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',pram:'',pcpu:'',pstor:'',pscr:'',pgpu:'',onlyNew:false,page:0,catTab:'table'});
  if(type==='brand')state.brand=val; else if(type==='usage')state.usage=val; else if(type==='cond')state.cond=val;
  else if(type==='band'){const m=(''+val).match(/\d+/g);if(m){state.pmin=m[0];state.pmax=(''+val).includes('+')?'':(m[1]||'');}}
  else if(type==='ram')state.pram=val; else if(type==='cpu')state.pcpu=val; else if(type==='storage')state.pstor=val; else if(type==='gpu')state.pgpu=val;
@@ -312,8 +359,69 @@ function cheapestPerParam(field,numeric){const scored=DATA.filter(r=>r.value_sco
  let ks=Object.keys(g);ks.sort(numeric?((a,b)=>b-a):((a,b)=>g[b].length-g[a].length));
  return ks.map(k=>({val:k,n:g[k].length,cheap:g[k].slice().sort((a,b)=>a.price-b.price)[0]}));}
 function render(){
- $('#q').oninput=()=>{state.q=$('#q').value;render1();};
+ $('#q').oninput=()=>{state.q=$('#q').value;state.page=0;render1();};
  render1();
+}
+// ---------- per-category / per-subcategory analysis ----------
+function bestBandsFor(rows){const g={};rows.forEach(r=>{if(!r.band)return;(g[r.band]=g[r.band]||[]).push(r);});
+ return Object.keys(g).sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)).map(b=>({band:b,n:g[b].length,best:g[b].slice().sort((x,y)=>(y.spec_score||0)-(x.spec_score||0))[0]}));}
+function relevantParams(rows){const cand=[['ram','RAM',true,' GB'],['cpu_fam','CPU',false,''],['storage','Yaddaş',false,''],['gpu','Video kart',false,''],['screen','Ekran',true,'″']];
+ const n=rows.length;return cand.filter(c=>rows.filter(r=>r[c[0]]!=null&&r[c[0]]!=='').length>=Math.max(3,n*0.12));}
+function cheapestForField(rows,field,numeric){const g={};rows.forEach(r=>{if(!r.price||r[field]==null||r[field]==='')return;(g[r[field]]=g[r[field]]||[]).push(r);});
+ let ks=Object.keys(g);ks.sort(numeric?((a,b)=>b-a):((a,b)=>g[b].length-g[a].length));
+ return ks.map(k=>({val:k,n:g[k].length,cheap:g[k].slice().sort((a,b)=>a.price-b.price)[0]}));}
+// Component parameter extractor — components keep specs in the parsed `params` string, not structured fields.
+// Parse params (clean) first; use name only for GPU model. Sanity-bound capacities to reject model-number noise.
+function compKey(r){
+ const p=(r.params||'');const nm=(r.name||'');const sub=(r.subcategory||'');
+ const gpuRe=/\b(RTX|GTX|RX|Arc|Radeon)\s*\d{3,4}\s*(?:Ti|Super|XT)?\b/i;
+ const cap=s=>{const c=(s||'').match(/(\d+(?:\.\d+)?)\s*(TB|GB)\b/i);if(!c)return null;const tb=/tb/i.test(c[2]);const gb=+c[1]*(tb?1024:1);
+  if(gb<1||gb>16384)return null;return{k:(+c[1])+(tb?' TB':' GB'),lab:'Tutum',num:gb};};
+ if(/video|gpu|kart/i.test(sub)){const g=p.match(gpuRe)||nm.match(gpuRe);return g?{k:g[0].toUpperCase().replace(/\s+/g,' ').trim(),lab:'Model'}:null;}
+ if(/monitor/i.test(sub)){const s=p.match(/(\d{2}(?:\.\d)?)\s*(?:"|″|inch|inç)/i);return s&&+s[1]>=15&&+s[1]<=90?{k:s[1]+'″',lab:'Ölçü',num:+s[1]}:null;}
+ if(/disk|ssd|hdd|ram|yaddaş|yaddash/i.test(sub))return cap(p);
+ const g=p.match(gpuRe)||nm.match(gpuRe);if(g)return{k:g[0].toUpperCase().replace(/\s+/g,' ').trim(),lab:'Model'};
+ return cap(p);
+}
+const COMP_JUNK=/\b(protector|qoruyucu|kabel|adapter|perexod|stend|stand|mount|kron|lamp|lampa|işıq|çexol|klaviatura|mouse|siçan|çanta|sumka|kalonka|dinamik|şləyf|şleyf)\b/i;
+function cheapestByComp(rows){const g={};rows.forEach(r=>{if(!r.price)return;if(COMP_JUNK.test(r.name||''))return;const ck=compKey(r);if(!ck)return;const e=g[ck.k]||(g[ck.k]={lab:ck.lab,items:[]});e.items.push(r);});
+ let ks=Object.keys(g);if(!ks.length)return{lab:'',list:[]};
+ ks.sort((a,b)=>g[b].items.length-g[a].items.length); // popularity — surface mainstream values first
+ return {lab:g[ks[0]].lab||'Parametr',list:ks.slice(0,12).map(k=>({val:k,n:g[k].items.length,cheap:g[k].items.slice().sort((a,b)=>a.price-b.price)[0]}))};}
+function catAnalysis(cat){
+ const base=filtered(DATA,!state.sub);
+ const g={};base.forEach(r=>{const k=r.subcategory||'(digər)';(g[k]=g[k]||[]).push(r);});
+ const order=Object.keys(g).sort((a,b)=>g[b].length-g[a].length);
+ let out='';
+ order.forEach(sc=>{
+  const rows=g[sc];const scored=rows.filter(r=>r.value_score!=null);
+  const bands=bestBandsFor(scored);
+  const bandTbl=bands.length?`<table><thead><tr><th>Qiymət</th><th>Ən güclü model</th><th>Parametrlər</th><th>Dəyər</th></tr></thead><tbody>`+
+   bands.map(x=>`<tr><td><b>${esc(x.band)} ₼</b><div class="small">${x.n} elan</div></td>
+    <td><a href="${esc(x.best.link)}" target="_blank">${esc((x.best.name||'').slice(0,42))}</a>${x.best.new?' <span class="tg new">🆕</span>':''}${x.best.gpu?`<div class="small" style="color:#7e22ce;font-weight:600">${esc(x.best.gpu)}</div>`:''}</td>
+    <td class="small">${esc(x.best.params||'')}</td>
+    <td class="num"><span class="val" style="${valColor(x.best.value_score)}">${x.best.value_score}</span></td></tr>`).join('')+`</tbody></table>`:'<div class="small muted">Kifayət qədər data yoxdur.</div>';
+  const params=relevantParams(rows);
+  const cheapRow=x=>`<tr><td style="width:36%"><b>${esc(''+x.val)}</b> <span class="small">(${x.n})</span></td>
+      <td class="num shop" style="width:22%"><b>${fmt(x.cheap.price)} ₼</b></td>
+      <td><a href="${esc(x.cheap.link)}" target="_blank">${esc((x.cheap.name||'').slice(0,30))}</a></td></tr>`;
+  let cheap;
+  if(params.length){ // laptop/desktop structured fields
+   cheap=params.map(pf=>{const list=cheapestForField(scored.length?scored:rows,pf[0],pf[2]).slice(0,6);if(!list.length)return '';
+    return `<div style="margin-bottom:10px"><div class="small" style="font-weight:700;color:var(--ink);margin-bottom:3px">${pf[1]}</div><table><tbody>`+
+     list.map(x=>cheapRow({val:x.val+pf[3],n:x.n,cheap:x.cheap})).join('')+`</tbody></table></div>`;}).join('');
+  } else { // components — extract param from free-text params/name
+   const cb=cheapestByComp(scored.length?scored:rows);
+   cheap=cb.list.length?`<div style="margin-bottom:10px"><div class="small" style="font-weight:700;color:var(--ink);margin-bottom:3px">${esc(cb.lab)}</div><table><tbody>`+cb.list.map(cheapRow).join('')+`</tbody></table></div>`:'';
+  }
+  if(!cheap)cheap='<div class="small muted">Uyğun parametr datası yoxdur.</div>';
+  out+=`<div class="panel"><h2>📂 ${esc(sc)} <span class="count">· ${rows.length} elan</span></h2>
+   <div class="grid2">
+    <div><h3>💰 Qiymət aralığına görə ən güclü parametrlər</h3>${bandTbl}</div>
+    <div><h3>🎯 Parametrə görə ən yaxşı qiymətdə məhsullar</h3>${cheap}</div>
+   </div></div>`;
+ });
+ return out||'<div class="panel muted">Bu seçim üçün data yoxdur.</div>';
 }
 function render1(){
  const root=$('#root');const v=state.view;
@@ -358,14 +466,24 @@ function render1(){
   });
   root.innerHTML=hInner;
  } else if(v==='new'){
-  title='🆕 Yeni məhsullar';const rows=DATA.filter(r=>r.new);sub=`${rows.length} elan bu skanda`;
-  root.innerHTML=kpiStrip(rows)+`<div class="panel">${filtersBar(true)}<div class="tblwrap">${tableHTML(sortRows(filtered(rows)))}</div></div>`;
-  bindFilters();bindTable();
+  title='🆕 Yeni məhsullar';const base=DATA.filter(r=>r.new);const fr=filtered(base);const rows=sortRows(fr);sub=`${base.length} elan bu skanda · ${rows.length} göstərilir`;
+  root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}<div class="tblwrap">${tableHTML(rows)}</div>${pager(rows.length)}</div>`;
+  bindFilters();bindTable();bindPager();
  } else if(v==='table'){
   const cm=META.cats.find(c=>c.slug===state.cat);title=cm?cm.label:'Bütün elanlar';
-  const rows=sortRows(filtered(DATA));sub=`${rows.length} nəticə`;
-  root.innerHTML=kpiStrip(filtered(DATA))+`<div class="panel">${filtersBar(true)}<div class="tblwrap">${tableHTML(rows)}</div></div>`;
-  bindFilters();bindTable();
+  const fr=filtered(DATA);
+  const tabs=cm?`<div class="subtabs">
+    <button class="stab ${state.catTab!=='analiz'?'on':''}" data-tab="table">📋 Cədvəl</button>
+    <button class="stab ${state.catTab==='analiz'?'on':''}" data-tab="analiz">📊 Alt-kateqoriya analizi</button></div>`:'';
+  if(cm&&state.catTab==='analiz'){
+   sub=`${fr.length} nəticə · alt-kateqoriyalar üzrə ən yaxşılar`;
+   root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}</div>`+catAnalysis(state.cat);
+   bindFilters();bindSubtabs();
+  } else {
+   const rows=sortRows(fr);sub=`${rows.length} nəticə`;
+   root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}<div class="tblwrap">${tableHTML(rows)}</div>${pager(rows.length)}</div>`;
+   bindFilters();bindSubtabs();bindTable();bindPager();
+  }
  } else if(v==='analysis'){
   title='📈 Parametr analizi';sub='hər dəyər üçün ən ucuz / orta / ən bahalı';
   const scoped=DATA.filter(r=>r.value_score!=null && (state.cat?r.category===state.cat:true));
@@ -375,9 +493,9 @@ function render1(){
    analysisPanel('Yaddaş','storage',scoped);
   bindFilters();
  } else if(v==='stars'){
-  title='⭐ Seçilmişlər';const rows=DATA.filter(r=>STAR.has(r.id));sub=`${rows.length} qeyd olunmuş`;
-  root.innerHTML=rows.length?`<div class="panel"><div class="tblwrap">${tableHTML(sortRows(rows))}</div></div>`:'<div class="panel muted">Hələ heç nə seçməmisən. Cədvəldə ★ ulduza kliklə.</div>';
-  bindTable();
+  title='⭐ Seçilmişlər';const rows=sortRows(DATA.filter(r=>STAR.has(r.id)));sub=`${rows.length} qeyd olunmuş`;
+  root.innerHTML=rows.length?`<div class="panel"><div class="tblwrap">${tableHTML(rows)}</div>${pager(rows.length)}</div>`:'<div class="panel muted">Hələ heç nə seçməmisən. Cədvəldə ★ ulduza kliklə.</div>';
+  bindTable();if(rows.length)bindPager();
  }
  $('#vtitle').textContent=title;$('#vsub').textContent=sub;
 }
