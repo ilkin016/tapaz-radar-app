@@ -124,7 +124,9 @@ const store={get(){try{return new Set(JSON.parse(localStorage.getItem('radar_sta
 let STAR=store.get();
 $('#brsub').textContent=`${META.n_total} elan · ${META.n_new} 🆕 · ${META.run_ts.slice(0,10)}`;
 
-const state={view:'overview',cat:'',sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,q:'',sortKey:'value_score',sortDir:-1};
+const state={view:'overview',cat:'',sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,q:'',
+ pram:'',pcpu:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1};
+function distinct(field,cat){const s=new Set();DATA.forEach(r=>{if(cat&&r.category!==cat)return;const v=r[field];if(v!=null&&v!=='')s.add(v);});return [...s];}
 
 // ---------- navigation ----------
 const NAV=[['overview','📊 İcmal'],['best','⭐ Ən uyğun'],['new','🆕 Yeni'],['SEP','Kateqoriyalar'],
@@ -156,6 +158,13 @@ function filtered(base){
   if(state.seller&&r.seller_type!==state.seller)return false;
   if(state.usage&&r.usage!==state.usage)return false;
   if(state.brand&&r.brand!==state.brand)return false;
+  if(state.pram&&(''+r.ram)!==state.pram)return false;
+  if(state.pcpu&&r.cpu_fam!==state.pcpu)return false;
+  if(state.pstor&&r.storage!==state.pstor)return false;
+  if(state.pscr&&(''+r.screen)!==state.pscr)return false;
+  if(state.pgpu==='__has'&&!r.gpu)return false;
+  if(state.pgpu==='__no'&&r.gpu)return false;
+  if(state.pgpu&&state.pgpu!=='__has'&&state.pgpu!=='__no'&&r.gpu!==state.pgpu)return false;
   if(state.pmin!==''&&(r.price||0)<+state.pmin)return false;
   if(state.pmax!==''&&(r.price||1e9)>+state.pmax)return false;
   if(state.onlyNew&&!r.new)return false;
@@ -206,6 +215,20 @@ function bindTable(){
 }
 function filtersBar(withCat){
  const subs=(state.cat&&META.subs[state.cat])||[];
+ const cat=state.cat;
+ const psel=(id,field,label,cur,numeric,suffix='')=>{let vals=distinct(field,cat);if(!vals.length)return '';
+  vals.sort(numeric?((a,b)=>b-a):((a,b)=>(''+a).localeCompare(''+b,'az')));
+  return `<select id="${id}"><option value="">${label}: hamısı</option>`+vals.map(v=>`<option value="${esc(''+v)}" ${cur===(''+v)?'selected':''}>${esc(''+v)}${suffix}</option>`).join('')+`</select>`;};
+ const gpuVals=distinct('gpu',cat).sort((a,b)=>(''+a).localeCompare(''+b));
+ const gpuSel=gpuVals.length?`<select id="f_pgpu"><option value="">Video kart: hamısı</option><option value="__has" ${state.pgpu==='__has'?'selected':''}>✓ var (diskret)</option><option value="__no" ${state.pgpu==='__no'?'selected':''}>— yox</option>${gpuVals.map(v=>`<option value="${esc(v)}" ${state.pgpu===v?'selected':''}>${esc(v)}</option>`).join('')}</select>`:'';
+ const paramRow=`<div class="controls" style="margin-top:-4px">
+  <span class="small" style="align-self:center;font-weight:700">⚙️ Parametrlər:</span>
+  ${psel('f_pram','ram','RAM',state.pram,true,' GB')}
+  ${psel('f_pcpu','cpu_fam','CPU',state.pcpu,false)}
+  ${psel('f_pstor','storage','Yaddaş',state.pstor,false)}
+  ${psel('f_pscr','screen','Ekran',state.pscr,true,'"')}
+  ${gpuSel}
+ </div>`;
  return `<div class="controls">
   ${withCat?`<select id="f_cat"><option value="">Kateqoriya: hamısı</option>${META.cats.map(c=>`<option value="${c.slug}" ${state.cat===c.slug?'selected':''}>${c.label}</option>`).join('')}</select>`:''}
   ${subs.length?`<select id="f_sub"><option value="">Alt-kateqoriya: hamısı</option>${subs.map(s=>`<option ${state.sub===s?'selected':''}>${esc(s)}</option>`).join('')}</select>`:''}
@@ -222,19 +245,20 @@ function filtersBar(withCat){
    <button data-sort="price_desc">↓ Ən bahalı</button>
   </span>
   <button class="chip" id="f_clear">Təmizlə</button>
- </div>`;
+ </div>${paramRow}`;
 }
 function bindFilters(){
- const set=(id,key)=>{const e=$('#'+id);if(e)e.onchange=()=>{state[key]=e.value;if(key==='cat')state.sub='';render();};};
+ const set=(id,key)=>{const e=$('#'+id);if(e)e.onchange=()=>{state[key]=e.value;
+  if(key==='cat'){state.sub='';state.pram='';state.pcpu='';state.pstor='';state.pscr='';state.pgpu='';}render();};};
  set('f_cat','cat');set('f_sub','sub');set('f_usage','usage');set('f_cond','cond');set('f_seller','seller');set('f_brand','brand');
- ['f_pmin','pmin','f_pmax','pmax'].forEach((_,i)=>{});
+ set('f_pram','pram');set('f_pcpu','pcpu');set('f_pstor','pstor');set('f_pscr','pscr');set('f_pgpu','pgpu');
  const pn=$('#f_pmin'),px=$('#f_pmax');if(pn)pn.oninput=()=>{state.pmin=pn.value;render();};if(px)px.oninput=()=>{state.pmax=px.value;render();};
  const fn=$('#f_new');if(fn)fn.onchange=()=>{state.onlyNew=fn.checked;render();};
  $('#root').querySelectorAll('.qs button').forEach(b=>b.onclick=()=>{const s=b.dataset.sort;
   if(s==='price_asc'){state.sortKey='price';state.sortDir=1;}else if(s==='price_desc'){state.sortKey='price';state.sortDir=-1;}
   else{state.sortKey='value_score';state.sortDir=-1;}render();});
- const cl=$('#f_clear');if(cl)cl.onclick=()=>{Object.assign(state,{sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false});render();};
- // restore selected values
+ const cl=$('#f_clear');if(cl)cl.onclick=()=>{Object.assign(state,{sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,
+  pram:'',pcpu:'',pstor:'',pscr:'',pgpu:''});render();};
  [['f_usage','usage'],['f_cond','cond'],['f_seller','seller']].forEach(([id,k])=>{const e=$('#'+id);if(e)e.value=state[k];});
 }
 
