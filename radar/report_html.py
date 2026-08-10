@@ -123,6 +123,30 @@ a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
 .pgdots{color:var(--muted);padding:0 2px}
 .pgmeta{color:var(--muted);font-size:11.5px;margin-left:8px}
 .pgsize{margin-left:auto}
+.an-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin:0 0 14px;padding-bottom:11px;border-bottom:1px solid var(--line)}
+.an-head h2{margin:0;font-size:15px}
+.an-stats{font-size:11.5px;color:var(--muted);font-weight:600}.an-stats b{color:var(--ink)}
+.an-col h3{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--acc2);margin:0 0 10px}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.spec{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--chip);color:var(--muted);white-space:nowrap;letter-spacing:.2px}
+.spec.cpu{background:rgba(37,99,235,.13);color:#2563eb}
+.spec.ram{background:rgba(13,148,136,.15);color:#0d9488}
+.spec.ssd{background:rgba(124,58,237,.15);color:#7c3aed}
+.spec.gpu{background:rgba(219,39,119,.15);color:#db2777}
+@media(prefers-color-scheme:dark){.spec.cpu{color:#7aa5ff}.spec.ram{color:#2dd4bf}.spec.ssd{color:#a78bfa}.spec.gpu{color:#f472b6}}
+.bt-tbl td{padding:9px 8px;vertical-align:middle}
+.bt-tbl .bandc{white-space:nowrap}.bt-tbl .bandc b{font-size:13px}
+.ptag{color:var(--good);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;margin-left:4px}
+.pwwrap{display:flex;align-items:center;gap:8px;min-width:96px}
+.pw{flex:1;height:8px;background:var(--chip);border-radius:5px;overflow:hidden;min-width:52px}
+.pw i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:5px}
+.pwn{font-size:11.5px;font-weight:800;font-variant-numeric:tabular-nums;min-width:22px;text-align:right}
+.pgroup{margin-bottom:13px}
+.pgh{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);display:flex;align-items:center;gap:6px;margin:0 0 6px}
+.pgrid{display:grid;grid-template-columns:auto 1fr auto;gap:5px 12px;align-items:baseline}
+.pgrid .pv{font-weight:800;font-size:12px;white-space:nowrap}.pgrid .pv small{color:var(--muted);font-weight:600;margin-left:4px;font-size:10px}
+.pgrid .pm{color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.pgrid .pp{color:var(--good);font-weight:800;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .mtoggle{display:none}@media(max-width:900px){.mtoggle{display:inline-block}}
 </style></head><body>
 <div class="app">
@@ -404,6 +428,17 @@ function cheapestByComp(rows){const g={};rows.forEach(r=>{if(!r.price)return;if(
  let ks=Object.keys(g);if(!ks.length)return{lab:'',list:[]};
  ks.sort((a,b)=>g[b].items.length-g[a].items.length); // popularity — surface mainstream values first
  return {lab:g[ks[0]].lab||'Parametr',list:ks.slice(0,12).map(k=>({val:k,n:g[k].items.length,cheap:g[k].items.slice().sort((a,b)=>a.price-b.price)[0]}))};}
+// Parsed spec chips — structured fields for laptop/desktop, else split the params string.
+function specChips(r){let c=[];
+ if(r.cpu||r.ram||r.storage||r.gpu||r.screen){
+  if(r.cpu)c.push(['cpu',r.cpu]);
+  if(r.ram)c.push(['ram',r.ram+' GB']);
+  if(r.storage)c.push(['ssd',r.storage]);
+  if(r.gpu)c.push(['gpu',r.gpu]);
+  if(r.screen)c.push(['scr',r.screen+'″']);
+ } else if(r.params){c=r.params.split(/[·,]/).map(s=>s.trim()).filter(Boolean).slice(0,5).map(s=>['scr',s]);}
+ return c.length?'<div class="chips">'+c.map(x=>`<span class="spec ${x[0]}">${esc(x[1])}</span>`).join('')+'</div>':'';}
+const PICON={'RAM':'🧠','CPU':'⚙️','Yaddaş':'💾','Video kart':'🎮','Ekran':'🖥️','Tutum':'💾','Model':'🎮','Ölçü':'🖥️','Təzələnmə':'🔄','Parametr':'🔧'};
 function catAnalysis(cat){
  const base=filtered(DATA,!state.sub);
  const g={};base.forEach(r=>{const k=r.subcategory||'(digər)';(g[k]=g[k]||[]).push(r);});
@@ -411,30 +446,31 @@ function catAnalysis(cat){
  let out='';
  order.forEach(sc=>{
   const rows=g[sc];const scored=rows.filter(r=>r.value_score!=null);
+  const maxSpec=Math.max(1,...scored.map(r=>r.spec_score||0));
+  const wp=rows.filter(r=>r.price);const avg=wp.length?wp.reduce((a,b)=>a+b.price,0)/wp.length:0;
+  const nnew=rows.filter(r=>r.new).length,nshop=rows.filter(r=>r.seller_type==='Mağaza').length;
   const bands=bestBandsFor(scored);
-  const bandTbl=bands.length?`<table><thead><tr><th>Qiymət</th><th>Ən güclü model</th><th>Parametrlər</th><th>Dəyər</th></tr></thead><tbody>`+
-   bands.map(x=>`<tr><td><b>${esc(x.band)} ₼</b><div class="small">${x.n} elan</div></td>
-    <td><a href="${esc(x.best.link)}" target="_blank">${esc((x.best.name||'').slice(0,42))}</a>${x.best.new?' <span class="tg new">🆕</span>':''}${x.best.gpu?`<div class="small" style="color:#7e22ce;font-weight:600">${esc(x.best.gpu)}</div>`:''}</td>
-    <td class="small">${esc(x.best.params||'')}</td>
-    <td class="num"><span class="val" style="${valColor(x.best.value_score)}">${x.best.value_score}</span></td></tr>`).join('')+`</tbody></table>`:'<div class="small muted">Kifayət qədər data yoxdur.</div>';
+  const bandTbl=bands.length?`<table class="bt-tbl"><thead><tr><th>Büdcə</th><th>Ən güclü konfiqurasiya</th><th>Güc</th></tr></thead><tbody>`+
+   bands.map(x=>{const sp=x.best.spec_score||0,pct=Math.max(4,Math.round(sp/maxSpec*100));
+    return `<tr><td class="bandc"><b>${esc(x.band)} ₼</b><div class="small">${x.n} model</div></td>
+    <td><a href="${esc(x.best.link)}" target="_blank">${esc((x.best.name||'').slice(0,46))}</a>${x.best.new?' <span class="tg new">🆕</span>':''}<span class="ptag">${fmt(x.best.price)} ₼</span>${specChips(x.best)}</td>
+    <td><div class="pwwrap"><div class="pw"><i style="width:${pct}%"></i></div><span class="pwn">${pct}</span></div></td></tr>`;}).join('')+`</tbody></table>`:'<div class="small muted">Kifayət qədər data yoxdur.</div>';
+  const cheapGroup=(label,list)=>{if(!list.length)return '';
+   return `<div class="pgroup"><div class="pgh"><span>${PICON[label]||'🔧'}</span> ${esc(label)}</div><div class="pgrid">`+
+    list.map(x=>`<span class="pv">${esc(''+x.val)}<small>${x.n}</small></span><span class="pm"><a href="${esc(x.cheap.link)}" target="_blank">${esc(x.cheap.name||'')}</a></span><span class="pp">${fmt(x.cheap.price)} ₼</span>`).join('')+`</div></div>`;};
   const params=relevantParams(rows);
-  const cheapRow=x=>`<tr><td style="width:36%"><b>${esc(''+x.val)}</b> <span class="small">(${x.n})</span></td>
-      <td class="num shop" style="width:22%"><b>${fmt(x.cheap.price)} ₼</b></td>
-      <td><a href="${esc(x.cheap.link)}" target="_blank">${esc((x.cheap.name||'').slice(0,30))}</a></td></tr>`;
   let cheap;
   if(params.length){ // laptop/desktop structured fields
-   cheap=params.map(pf=>{const list=cheapestForField(scored.length?scored:rows,pf[0],pf[2]).slice(0,6);if(!list.length)return '';
-    return `<div style="margin-bottom:10px"><div class="small" style="font-weight:700;color:var(--ink);margin-bottom:3px">${pf[1]}</div><table><tbody>`+
-     list.map(x=>cheapRow({val:x.val+pf[3],n:x.n,cheap:x.cheap})).join('')+`</tbody></table></div>`;}).join('');
-  } else { // components — extract param from free-text params/name
-   const cb=cheapestByComp(scored.length?scored:rows);
-   cheap=cb.list.length?`<div style="margin-bottom:10px"><div class="small" style="font-weight:700;color:var(--ink);margin-bottom:3px">${esc(cb.lab)}</div><table><tbody>`+cb.list.map(cheapRow).join('')+`</tbody></table></div>`:'';
+   cheap=params.map(pf=>cheapGroup(pf[1],cheapestForField(scored.length?scored:rows,pf[0],pf[2]).slice(0,6).map(x=>({val:x.val+pf[3],n:x.n,cheap:x.cheap})))).join('');
+  } else { // components — param from free-text params/name
+   const cb=cheapestByComp(scored.length?scored:rows);cheap=cheapGroup(cb.lab||'Parametr',cb.list);
   }
   if(!cheap)cheap='<div class="small muted">Uyğun parametr datası yoxdur.</div>';
-  out+=`<div class="panel"><h2>📂 ${esc(sc)} <span class="count">· ${rows.length} elan</span></h2>
+  out+=`<div class="panel">
+   <div class="an-head"><h2>📂 ${esc(sc)}</h2><div class="an-stats"><b>${fmt(rows.length)}</b> elan · orta <b>${fmt(avg)} ₼</b> · <b>${nnew}</b> 🆕 · <b>${nshop}</b> 🏪</div></div>
    <div class="grid2">
-    <div><h3>💰 Qiymət aralığına görə ən güclü parametrlər</h3>${bandTbl}</div>
-    <div><h3>🎯 Parametrə görə ən yaxşı qiymətdə məhsullar</h3>${cheap}</div>
+    <div class="an-col"><h3>💰 Büdcəyə görə ən güclü konfiqurasiya</h3>${bandTbl}</div>
+    <div class="an-col"><h3>🎯 Parametrə görə ən sərfəli qiymət</h3>${cheap}</div>
    </div></div>`;
  });
  return out||'<div class="panel muted">Bu seçim üçün data yoxdur.</div>';
