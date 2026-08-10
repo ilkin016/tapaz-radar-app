@@ -6,6 +6,7 @@
 - **Qiymət aralığı intervalları 200₼** oldu (İcmal qrafiki + alt-kat analizi cədvəlləri) — `band200(price)`.
 - **CPU Nəsil + Seriya filtri** (yalnız noutbuk/masaüstü): Apple M1-4, Intel N-ci nəsil, Core Ultra Seriya, Ryzen N000; suffix U/H/HX/HS/HK/HQ/G/K/F/T/P/Y/M/MQ/QM. `cpuGen`/`cpuSer` cpu mətnindən parse+keş, `VALID_SUF` whitelist. Test: Intel 13-cü+HX → 148 (i7-13650HX).
 - **«Büdcəyə görə ən yaxşı» + «parametrə görə ən ucuz» İcmaldan SİLİNDİ** — istifadəçi tələbi ilə artıq yalnız hər kateqoriyanın «Alt-kateqoriya analizi» tabında (hər alt-kat ayrı). İcmalda yönləndirici hint qaldı → İcmal indi kompakt (KPI + kart + 4 qrafik).
+- **Alt-kateqoriya analizi peşəkarlaşdırıldı:** parametrlər rəngli **spec çiplərinə** (`specChips` — CPU/RAM/SSD/GPU/ekran; komponentlərdə params-split), «ən güclü» cədvəldə yanıldıcı dəyər badge yerinə **0-100 normallaşdırılmış Güc barı** (spec_score/maxSpec), panel başlığında **statistika** (elan·orta qiymət·yeni·mağaza), sərfəli-qiymət **ikonlu qruplar** + hizalanmış grid.
 
 ---
 
