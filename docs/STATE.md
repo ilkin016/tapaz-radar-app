@@ -7,7 +7,10 @@
 - **CPU Nəsil + Seriya filtri** (yalnız noutbuk/masaüstü): Apple M1-4, Intel N-ci nəsil, Core Ultra Seriya, Ryzen N000; suffix U/H/HX/HS/HK/HQ/G/K/F/T/P/Y/M/MQ/QM. `cpuGen`/`cpuSer` cpu mətnindən parse+keş, `VALID_SUF` whitelist. Test: Intel 13-cü+HX → 148 (i7-13650HX).
 - **«Büdcəyə görə ən yaxşı» + «parametrə görə ən ucuz» İcmaldan SİLİNDİ** — istifadəçi tələbi ilə artıq yalnız hər kateqoriyanın «Alt-kateqoriya analizi» tabında (hər alt-kat ayrı). İcmalda yönləndirici hint qaldı → İcmal indi kompakt (KPI + kart + 4 qrafik).
 - **Alt-kateqoriya analizi peşəkarlaşdırıldı:** parametrlər rəngli **spec çiplərinə** (`specChips` — CPU/RAM/SSD/GPU/ekran; komponentlərdə params-split), «ən güclü» cədvəldə yanıldıcı dəyər badge yerinə **0-100 normallaşdırılmış Güc barı** (spec_score/maxSpec), panel başlığında **statistika** (elan·orta qiymət·yeni·mağaza), sərfəli-qiymət **ikonlu qruplar** + hizalanmış grid.
-- **Yeni «💰 Büdcə üzrə» alt-tabı** (Cədvəl / Büdcə üzrə / Alt-kateqoriya analizi) — hər 200₼ aralıq **öz panelində**, **15 məhsul/səhifə + per-aralıq müstəqil pagination** (`budgetView`/`bindBandPagers`/`state.bandPages`, filtr dəyişəndə imza ilə avto-reset). Standart olaraq **yalnız «Yeni» vəziyyət** (işlənmişlər Vəziyyət filtri «İkinci əl» ilə). Sətirlər: spec çiplər + Güc barı + qiymət + telefon; sıralama sort düymələrinə tabe.
+- **4 alt-tab:** 📋 Cədvəl · 💰 Büdcə üzrə · 🎯 Parametr üzrə · 📊 Alt-kateqoriya analizi.
+- **«💰 Büdcə üzrə»** (`budgetView`) — hər 200₼ aralıq **öz panelində**, **15 məhsul/səhifə + per-aralıq müstəqil pagination** (`bindBandPagers`/`state.bandPages`, filtr dəyişəndə imza `_bsig` ilə avto-reset). Standart olaraq **yalnız «Yeni» vəziyyət** (işlənmişlər Vəziyyət filtri «İkinci əl» ilə).
+- **«🎯 Parametr üzrə»** (`paramView`/`bindParamSel`/`state.paramTab`) — **CPU/RAM/VGA** seçicisi; hər parametr dəyəri öz panelində (RAM: r.ram 64→2GB; CPU: r.cpu_fam; VGA: r.gpu top-40 saya görə). Hər qrupda məhsullar **ən ucuzdan bahalıya**, 15/səhifə müstəqil pagination (state.bandPages `p|dim|val` açarları ilə paylaşılır). Yalnız struktur sahələr (noutbuk/masaüstü).
+- Bütün panel sətirləri: spec çiplər + Güc barı + qiymət + vəziyyət + satıcı + telefon.
 
 ---
 
