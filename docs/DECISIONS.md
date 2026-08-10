@@ -93,3 +93,13 @@
 - **Rədd edilən:** statik uzun bar siyahıları.
 - **Toxunulan:** `radar/report_html.py` (`cbars`/`pick`/`bindCbars`/`bandDist`/`bestPerBand`/`cheapestPerParam`; parametr filtrləri `distinct`/`psel`; kateqoriya-reset `bindFilters`).
 - **⚠️** Kateqoriya dəyişəndə bütün filtrlər QƏSDƏN sıfırlanır (`if(key==='cat')`). Bu istifadəçi tələbidir.
+
+## 2026-08-10 · Alt-kateqoriya analizi + komponent parametr çıxarıcısı + pagination
+
+- **Qərar (analiz):** Hər kateqoriya səhifəsində sub-tab ("Cədvəl" / "Alt-kateqoriya analizi"). Analiz tabı hər alt-kateqoriyanı **ayrıca panel** kimi göstərir: qiymət-bandına görə ən güclü (`bestBandsFor`, max `spec_score`) + parametrə görə ən ucuz.
+- **Qərar (komponent parametrləri):** Noutbuk/masaüstü struktur sahələrdən oxunur; **komponentlərdə struktur sahələr BOŞDUR** (ram/cpu_fam/storage/gpu/screen = 0) — spec `params` mətnindədir. `compKey(r)` `params`-dan çıxarır: GPU model (RTX/GTX/RX regex), SSD/RAM tutum (TB/GB, 1–16384 GB sanity), monitor ölçü (yalnız `params`-dan, çünki elan başlığındakı dırnaq `241V8B/89"`→89″ yanlış tutulur). `COMP_JUNK` regex aksesuarları (protector/kabel/stand/lamp…) atır. Populyarlığa görə sıralanır (əsas dəyərlər üstdə, nadir böyük deyil).
+- **Səbəb:** İstifadəçi "hər kateqoriya altında ona uyğun parametrlərə görə ən yaxşı qiymət və qiymətə görə ən yaxşı parametr, hər alt-kateqoriya ayrı" istədi. Komponentlər üçün struktur sahə olmadığından mətn-parser lazım oldu.
+- **Rədd edilən:** `name`-dən parse (model nömrələrini tutur: "1200 TB", empty-box 40₼); tutuma görə sıralama (nadir 12TB/89″ üstə çıxırdı).
+- **Qərar (pagination):** Cədvəl səhifələnir (`state.ps` 25/50/100/200, `state.page`), əvvəlki "ilk 400" limiti əvəzinə. Filtr/sort/axtarış/kateqoriya dəyişəndə `page=0`.
+- **Toxunulan:** `radar/report_html.py` (`catAnalysis`/`bestBandsFor`/`relevantParams`/`compKey`/`cheapestByComp`/`COMP_JUNK`; `pager`/`bindPager`; `bindSubtabs`; `state.page/ps/catTab`; `filtered(base,skipSub)`).
+- **⚠️** `compKey` monitor ölçüsünü YALNIZ `params`-dan oxu (name-dəki dırnaq artefaktı). Komponent skorları `spec_score`-a əsaslanır — komponent enrichment-i dəyişsən analiz də dəyişər.

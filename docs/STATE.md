@@ -1,6 +1,6 @@
 # tap.az Radar — Cari Vəziyyət
 
-**Son yenilənmə:** 2026-08-10 (session: interaktiv İcmal + parametr filtrləri + 100% əhatə təsdiqi)
+**Son yenilənmə:** 2026-08-10 (session: alt-kateqoriya analizi + pagination + dizayn v2; əvvəl interaktiv İcmal + parametr filtrləri + 100% əhatə)
 
 ---
 
@@ -26,7 +26,17 @@ Hər ikisi eyni `out/dashboard.html`-i servis edir (17.6 MB, self-contained SPA)
 
 ---
 
-## 🔨 Bu sessionda nə dəyişdi (`radar/report_html.py`)
+## 🔨 Ən son dəyişikliklər — dizayn v2 + analiz + pagination (`radar/report_html.py`)
+
+1. **Hər kateqoriya səhifəsində "📊 Alt-kateqoriya analizi" tabı** (sub-tab: Cədvəl ⇄ Analiz). Hər alt-kateqoriya **ayrıca panel**:
+   - 💰 **Qiymət aralığına görə ən güclü parametrlər** (`bestBandsFor` — hər banda max `spec_score`)
+   - 🎯 **Parametrə görə ən yaxşı qiymət** — noutbuk/masaüstü struktur sahələr (RAM/CPU/Yaddaş/GPU/Ekran); komponentlər `compKey` ilə `params` mətnindən (GPU model / SSD-RAM tutum / monitor ölçü), sanity guard + `COMP_JUNK` filtr + populyarlıq sıralaması.
+2. **Pagination** — cədvəldə səhifələmə (25/50/100/200 seçimli, ‹Əvvəl 1 2 3 … N Sonra›, səhifə meta). Əvvəl yalnız ilk 400 render olunurdu. Filtr/sort/axtarış dəyişəndə `page=0`.
+3. **Dizayn v2** — gölgəli kartlar, accent-zolaqlı KPI, zebra+hover cədvəl, sticky başlıq, sub-tab, gradient bar, cilalı brand-logo, focus-ring. Kateqoriya **nav kliki də** bütün filtrləri sıfırlayır.
+
+Test: pagination (9163→184 səhifə, 100/səhifə→92 səhifə ✓), Komponent analizi (Monitor/SSD/GPU/RAM ayrı-ayrı, əsas dəyərlər üstdə ✓), JS konsol təmiz.
+
+## 🔨 Əvvəlki dəyişikliklər (`radar/report_html.py`)
 
 1. **İcmal səhifəsi tam yenidən quruldu** — kompakt + interaktiv (əvvəl "uzun uzadı gedən qrafiklər" şikayəti):
    - KPI zolağı (Elan/Yeni/Orta qiymət/Mağaza/Gaming/Ofis)
