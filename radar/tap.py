@@ -26,8 +26,14 @@ def _post_json(url, payload, tries=4, timeout=40):
                 "User-Agent": UA, "Content-Type": "application/json", "Origin": "https://tap.az"})
             with urllib.request.urlopen(req, timeout=timeout, context=_CTX) as r:
                 return json.loads(r.read().decode("utf-8", "replace"))
+        except urllib.error.HTTPError as e:
+            last = e
+            if e.code in (403, 429, 503):  # rate-limit / temporary block → uzun backoff
+                time.sleep(min(90, 20 * (i + 1)))
+            else:
+                time.sleep(1.5 * (i + 1))
         except Exception as e:
-            last = e; time.sleep(1.2 * (i + 1))
+            last = e; time.sleep(1.5 * (i + 1))
     raise RuntimeError(f"POST failed: {last}")
 
 
@@ -41,9 +47,10 @@ def _get(url, tries=4, timeout=30):
         except urllib.error.HTTPError as e:
             if e.code in (404, 410):
                 return None, e.code
-            last = e; time.sleep(1.2 * (i + 1))
+            last = e
+            time.sleep(min(90, 20 * (i + 1)) if e.code in (403, 429, 503) else 1.5 * (i + 1))
         except Exception as e:
-            last = e; time.sleep(1.2 * (i + 1))
+            last = e; time.sleep(1.5 * (i + 1))
     return None, 0
 
 

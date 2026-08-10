@@ -47,32 +47,38 @@ def run(cap=None, workers=6, only=None):
         if only and cat["slug"] != only:
             continue
         slug = cat["slug"]
-        print(f"\n[{slug}] kraler başlayır…")
-        crawled = tap.crawl_category(cat["category_id"], cat.get("filters"), first=100,
-                                     cap=cap, log=lambda m: print(m))
-        print(f"[{slug}] cari elan: {len(crawled)}")
-        new_items, delisted = store.diff_new(slug, crawled, run_ts)
-        print(f"[{slug}] YENİ: {len(new_items)} · silinən (delisted): {len(delisted)}")
-        # enrich new listings
-        enriched = 0
-        if cat.get("enrich", True) and new_items:
-            def work(it):
-                d = tap.fetch_detail(it["id"])
-                if not d.get("available"):
-                    return None
-                d["phones"] = tap.reveal_phones(d["gid"]) if d.get("gid") else []
-                return enr.enrich(d, category=slug)
-            with ThreadPoolExecutor(max_workers=workers) as ex:
-                futs = {ex.submit(work, it): it for it in new_items}
-                for i, f in enumerate(as_completed(futs), 1):
-                    rec = f.result()
-                    if rec:
-                        store.upsert_listing(rec, slug, run_ts)
-                        enriched += 1
-                    if i % 25 == 0:
-                        print(f"  zənginləşdirildi {i}/{len(new_items)}")
-        store.record_run(run_ts, slug, len(crawled), len(new_items), len(delisted))
-        print(f"[{slug}] tamam: {enriched} yeni elan zənginləşdirildi.")
+        try:
+            print(f"\n[{slug}] kraler başlayır…")
+            crawled = tap.crawl_category(cat["category_id"], cat.get("filters"), first=100,
+                                         cap=cap, log=lambda m: print(m))
+            print(f"[{slug}] cari elan: {len(crawled)}")
+            new_items, delisted = store.diff_new(slug, crawled, run_ts)
+            print(f"[{slug}] YENİ: {len(new_items)} · silinən (delisted): {len(delisted)}")
+            # enrich new listings
+            enriched = 0
+            if cat.get("enrich", True) and new_items:
+                def work(it):
+                    d = tap.fetch_detail(it["id"])
+                    if not d.get("available"):
+                        return None
+                    d["phones"] = tap.reveal_phones(d["gid"]) if d.get("gid") else []
+                    return enr.enrich(d, category=slug)
+                with ThreadPoolExecutor(max_workers=workers) as ex:
+                    futs = {ex.submit(work, it): it for it in new_items}
+                    for i, f in enumerate(as_completed(futs), 1):
+                        try:
+                            rec = f.result()
+                        except Exception:
+                            rec = None
+                        if rec:
+                            store.upsert_listing(rec, slug, run_ts)
+                            enriched += 1
+                        if i % 25 == 0:
+                            print(f"  zənginləşdirildi {i}/{len(new_items)}")
+            store.record_run(run_ts, slug, len(crawled), len(new_items), len(delisted))
+            print(f"[{slug}] tamam: {enriched} yeni elan zənginləşdirildi.")
+        except Exception as e:
+            print(f"[{slug}] XƏTA — kateqoriya atlanır (hesabat yenə yaranacaq): {e}")
     # reports
     os.makedirs(OUT, exist_ok=True)
     listings = store.listings(active_only=True)
