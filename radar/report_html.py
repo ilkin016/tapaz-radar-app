@@ -219,7 +219,7 @@ function go(k){
 }
 
 // ---------- filtering / sorting ----------
-function filtered(base,skipSub,skipCond){
+function filtered(base,skipSub,skipCond,skipBrand){
  const q=state.q.toLowerCase();
  return base.filter(r=>{
   if(state.cat&&r.category!==state.cat)return false;
@@ -227,7 +227,7 @@ function filtered(base,skipSub,skipCond){
   if(!skipCond&&state.cond&&r.condition!==state.cond)return false;
   if(state.seller&&r.seller_type!==state.seller)return false;
   if(state.usage&&r.usage!==state.usage)return false;
-  if(state.brand&&r.brand!==state.brand)return false;
+  if(!skipBrand&&state.brand&&r.brand!==state.brand)return false;
   if(state.pram&&(''+r.ram)!==state.pram)return false;
   if(state.pcpu&&r.cpu_fam!==state.pcpu)return false;
   if(state.pcgen&&cpuGen(r)!==state.pcgen)return false;
@@ -602,7 +602,26 @@ function condModeBar(){return `<div class="controls" style="margin-bottom:0"><sp
   <button class="chip ${state.condMode==='used'?'on':''}" data-cm="used">♻️ Yalnız İkinci əl</button></div>`;}
 function applyCondMode(rows){return state.condMode==='yeni'?rows.filter(r=>r.condition==='Yeni'):(state.condMode==='used'?rows.filter(r=>r.condition==='İkinci əl'):rows);}
 function bindCondMode(){$('#root').querySelectorAll('[data-cm]').forEach(b=>b.onclick=()=>{state.condMode=b.dataset.cm;render();});}
-function bindBudgetSub(){$('#root').querySelectorAll('[data-bs]').forEach(b=>b.onclick=()=>{state.budgetSub=b.dataset.bs;state.bandPages={};render();});}
+function bindBudgetSub(){$('#root').querySelectorAll('[data-bs]').forEach(b=>b.onclick=()=>{state.budgetSub=b.dataset.bs;state.bandPages={};state.brand='';state.page=0;render();});}
+// Component table view: sub-category chips → brand breakdown → paginated table (price + parameters)
+function componentTable(cat){
+ let base=filtered(DATA,true,false,true); // alt-kat + brend burada; cond/usage/seller/qiymət/param saxlanır
+ const cnt={};base.forEach(r=>{const s=r.subcategory||'Digər';cnt[s]=(cnt[s]||0)+1;});
+ const ord=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);
+ let bsub=state.budgetSub;if(bsub!=='__all'&&!ord.includes(bsub))bsub=ord[0];
+ const subChips=`<div class="panel" style="padding:11px 14px;margin-bottom:12px"><div class="controls" style="margin:0"><span class="small" style="align-self:center;font-weight:700">📂 Alt-kateqoriya:</span>`
+  +`<button class="chip ${bsub==='__all'?'on':''}" data-bs="__all">🔀 Hamısı</button>`
+  +ord.map(s=>`<button class="chip ${bsub===s?'on':''}" data-bs="${esc(s)}">${esc(s)} <span class="small">${cnt[s]}</span></button>`).join('')+`</div></div>`;
+ const scoped=(bsub==='__all')?base:base.filter(r=>(r.subcategory||'Digər')===bsub);
+ const bcnt={};scoped.forEach(r=>{const b=r.brand||'Digər';bcnt[b]=(bcnt[b]||0)+1;});
+ const bord=Object.keys(bcnt).sort((a,b)=>bcnt[b]-bcnt[a]).slice(0,16);
+ const brandChips=`<div class="panel" style="padding:11px 14px;margin-bottom:12px"><div class="controls" style="margin:0"><span class="small" style="align-self:center;font-weight:700">🏷 Brend üzrə:</span>`
+  +`<button class="chip ${!state.brand?'on':''}" data-brk="">Hamısı ${scoped.length}</button>`
+  +bord.map(b=>`<button class="chip ${state.brand===b?'on':''}" data-brk="${esc(b)}">${esc(b)} <span class="small">${bcnt[b]}</span></button>`).join('')+`</div></div>`;
+ let rows=sortRows(state.brand?scoped.filter(r=>r.brand===state.brand):scoped);
+ return subChips+brandChips+`<div class="panel"><div class="tblwrap">${tableHTML(rows)}</div>${pager(rows.length)}</div>`;
+}
+function bindBrandBreak(){$('#root').querySelectorAll('[data-brk]').forEach(b=>b.onclick=()=>{state.brand=b.dataset.brk;state.page=0;render();});}
 function render1(){
  const root=$('#root');const v=state.view;
  let title='İcmal',sub='';
@@ -659,9 +678,16 @@ function render1(){
    root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true,true)}${tabs}</div>`+paramView(state.cat);
    bindFilters();bindSubtabs();bindParamSel();bindCondMode();bindBandPagers();
   } else {
-   const rows=sortRows(fr);sub=`${rows.length} nəticə`;
-   root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}<div class="tblwrap">${tableHTML(rows)}</div>${pager(rows.length)}</div>`;
-   bindFilters();bindSubtabs();bindTable();bindPager();
+   const subsAll=META.subs[state.cat]||[];
+   if(cm&&subsAll.length>1){ // komponent kimi çox-alt-kateqoriyalı: alt-kat seçimi + brend təsnifatı + cədvəl
+    sub=`alt-kateqoriya + brend üzrə`;
+    root.innerHTML=kpiStrip(filtered(DATA,true,false,true))+`<div class="panel">${filtersBar(true,false,true)}${tabs}</div>`+componentTable(state.cat);
+    bindFilters();bindSubtabs();bindBudgetSub();bindBrandBreak();bindTable();bindPager();
+   } else {
+    const rows=sortRows(fr);sub=`${rows.length} nəticə`;
+    root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}<div class="tblwrap">${tableHTML(rows)}</div>${pager(rows.length)}</div>`;
+    bindFilters();bindSubtabs();bindTable();bindPager();
+   }
   }
  } else if(v==='analysis'){
   title='📈 Parametr analizi';sub='hər dəyər üçün ən ucuz / orta / ən bahalı';
