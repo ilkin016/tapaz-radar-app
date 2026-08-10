@@ -88,13 +88,14 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
 .star{cursor:pointer;color:#cbd5e1;font-size:15px}.star.on{color:#f59e0b}
 .tblwrap{max-height:calc(100vh - 250px);overflow:auto;border:1px solid var(--line);border-radius:10px}
-.bars .bar{display:grid;grid-template-columns:130px 1fr 44px;gap:8px;align-items:center;margin:4px 0;font-size:12px}
-.bars .bt{background:var(--chip);border-radius:6px;height:13px;overflow:hidden}.bars .bt i{display:block;height:100%;background:var(--acc)}
-.bars .bv{text-align:right;color:var(--muted)}
+.bars .bar{display:grid;grid-template-columns:120px 1fr 40px;gap:8px;align-items:center;margin:3px 0;font-size:12px}
+.bars .bt{background:var(--chip);border-radius:6px;height:13px;overflow:hidden}.bars .bt i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:6px}
+.bars .bv{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.cbar{cursor:pointer;border-radius:7px;padding:2px 5px;transition:background .12s}.cbar:hover{background:var(--chip)}.cbar:hover .bt i{filter:brightness(1.18)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
 .catcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
-.catcard{background:var(--chip);border:1px solid var(--line);border-radius:12px;padding:14px;cursor:pointer}
-.catcard:hover{border-color:var(--acc2)}.catcard .b{font-size:22px;font-weight:800}
+.catcard{background:linear-gradient(160deg,var(--chip),transparent);border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;transition:transform .12s,border-color .12s,box-shadow .12s}
+.catcard:hover{border-color:var(--acc2);transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.12)}.catcard .b{font-size:24px;font-weight:800;margin:4px 0}
 .muted{color:var(--muted)}.hide{display:none}
 .count{color:var(--muted);font-weight:400;font-size:12px}
 .mtoggle{display:none}@media(max-width:900px){.mtoggle{display:inline-block}}
@@ -249,7 +250,7 @@ function filtersBar(withCat){
 }
 function bindFilters(){
  const set=(id,key)=>{const e=$('#'+id);if(e)e.onchange=()=>{state[key]=e.value;
-  if(key==='cat'){state.sub='';state.pram='';state.pcpu='';state.pstor='';state.pscr='';state.pgpu='';}render();};};
+  if(key==='cat')Object.assign(state,{sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,pram:'',pcpu:'',pstor:'',pscr:'',pgpu:''});render();};};
  set('f_cat','cat');set('f_sub','sub');set('f_usage','usage');set('f_cond','cond');set('f_seller','seller');set('f_brand','brand');
  set('f_pram','pram');set('f_pcpu','pcpu');set('f_pstor','pstor');set('f_pscr','pscr');set('f_pgpu','pgpu');
  const pn=$('#f_pmin'),px=$('#f_pmax');if(pn)pn.oninput=()=>{state.pmin=pn.value;render();};if(px)px.oninput=()=>{state.pmax=px.value;render();};
@@ -294,6 +295,22 @@ function kpiStrip(rows){
   ${K('🏪 Mağaza',sh)}${K('🎮 Gaming',g)}${K('💼 Ofis',o)}</div>`;
 }
 
+function bandDist(scored){const c={};scored.forEach(r=>{if(!r.band)return;let b=r.band;if((parseInt(b)||0)>=2000)b='2000+';c[b]=(c[b]||0)+1;});
+ const ord=Object.keys(c).sort((a,b)=>(a==='2000+'?1e9:parseInt(a))-(b==='2000+'?1e9:parseInt(b)));return {c,ord};}
+function cbars(counter,order,fmtk,type,limit){let items=(order||Object.keys(counter).sort((a,b)=>counter[b]-counter[a]));if(limit)items=items.slice(0,limit);
+ const mx=Math.max(1,...items.map(k=>counter[k]));
+ return '<div class="bars">'+items.map(k=>`<div class="bar cbar" data-type="${type}" data-val="${esc(''+k)}"><span>${esc(fmtk(k))}</span><span class="bt"><i style="width:${Math.round(counter[k]/mx*100)}%"></i></span><span class="bv">${counter[k]}</span></div>`).join('')+'</div>';}
+function pick(type,val){Object.assign(state,{cat:'',sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',pram:'',pcpu:'',pstor:'',pscr:'',pgpu:'',onlyNew:false});
+ if(type==='brand')state.brand=val; else if(type==='usage')state.usage=val; else if(type==='cond')state.cond=val;
+ else if(type==='band'){const m=(''+val).match(/\d+/g);if(m){state.pmin=m[0];state.pmax=(''+val).includes('+')?'':(m[1]||'');}}
+ else if(type==='ram')state.pram=val; else if(type==='cpu')state.pcpu=val; else if(type==='storage')state.pstor=val; else if(type==='gpu')state.pgpu=val;
+ state.view='table';[...$('#nav').children].forEach(b=>b.classList&&b.classList.remove('on'));render();window.scrollTo(0,0);}
+function bindCbars(){$('#root').querySelectorAll('.cbar').forEach(b=>b.onclick=()=>pick(b.dataset.type,b.dataset.val));}
+function bestPerBand(){const scored=DATA.filter(r=>r.value_score!=null);const g={};scored.forEach(r=>{(g[r.band]=g[r.band]||[]).push(r);});
+ return Object.keys(g).sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)).map(b=>({band:b,n:g[b].length,best:g[b].slice().sort((x,y)=>(y.spec_score||0)-(x.spec_score||0))[0]}));}
+function cheapestPerParam(field,numeric){const scored=DATA.filter(r=>r.value_score!=null && r.price && r[field]!=null && r[field]!=='');const g={};scored.forEach(r=>{(g[r[field]]=g[r[field]]||[]).push(r);});
+ let ks=Object.keys(g);ks.sort(numeric?((a,b)=>b-a):((a,b)=>g[b].length-g[a].length));
+ return ks.map(k=>({val:k,n:g[k].length,cheap:g[k].slice().sort((a,b)=>a.price-b.price)[0]}));}
 function render(){
  $('#q').oninput=()=>{state.q=$('#q').value;render1();};
  render1();
@@ -302,13 +319,32 @@ function render1(){
  const root=$('#root');const v=state.view;
  let title='İcmal',sub='';
  if(v==='overview'){
-  title='İcmal';sub=`${META.n_total} elan · ${META.n_new} yeni`;
+  title='İcmal';sub=`${META.n_total} elan · ${META.n_new} yeni · qrafiklərə klikləyib filtrlə`;
   const scored=DATA.filter(r=>r.value_score!=null);
-  const bandc=countBy(scored,'band');const bandord=Object.keys(bandc).sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0));
+  const bd=bandDist(scored);
+  const usageC={'Gaming':scored.filter(r=>r.usage==='Gaming').length,'Ofis / Gündəlik':scored.filter(r=>r.usage==='Ofis / Gündəlik').length};
+  const condC=countBy(scored,'condition');
+  const bpbRows=bestPerBand().map(x=>`<tr><td><b>${esc(x.band)} ₼</b><div class="small">${x.n} elan</div></td>
+    <td><a href="${esc(x.best.link)}" target="_blank">${esc(x.best.name)}</a>${x.best.new?' <span class="tg new">🆕</span>':''}</td>
+    <td class="small">${esc(x.best.params)}</td>${x.best.gpu?`<td><b style="color:#7e22ce">${esc(x.best.gpu)}</b></td>`:'<td class="small">—</td>'}
+    <td class="num">${fmt(x.best.price)} ₼</td><td class="num"><span class="val" style="${valColor(x.best.value_score)}">${x.best.value_score}</span></td></tr>`).join('');
+  const cheapCard=(t,field,numeric,suffix='')=>{const rows=cheapestPerParam(field,numeric).slice(0,12).map(x=>`<tr><td><b>${esc(''+x.val)}${suffix}</b><span class="small"> (${x.n})</span></td>
+      <td class="num shop"><b>${fmt(x.cheap.price)} ₼</b></td><td><a href="${esc(x.cheap.link)}" target="_blank">${esc((x.cheap.name||'').slice(0,32))}</a><div class="small">${esc(x.cheap.seller_type)}</div></td></tr>`).join('');
+    return `<div class="panel"><h2>${t} — ən yaxşı qiymət</h2><table><thead><tr><th>Dəyər</th><th>Ən ucuz</th><th>Model</th></tr></thead><tbody>${rows}</tbody></table></div>`;};
   root.innerHTML=kpiStrip(DATA)+
-   `<div class="panel"><h2>Kateqoriyalar</h2><div class="catcards">${META.cats.map(c=>`<div class="catcard" onclick="go('cat:${c.slug}')"><div>${c.label}</div><div class="b">${c.n}</div><div class="muted">bax →</div></div>`).join('')}</div></div>`+
-   `<div class="grid2"><div class="panel"><h2>Qiymət aralığı üzrə</h2>${bars(bandc,bandord,k=>k+' ₼')}</div>
-    <div class="panel"><h2>Brend üzrə</h2>${bars(countBy(scored,'brand'),null,x=>x,10)}</div></div>`;
+   `<div class="panel"><h2>Kateqoriyalar <span class="small">— klikləyib bax</span></h2><div class="catcards">${META.cats.map(c=>`<div class="catcard" onclick="go('cat:${c.slug}')"><div>${c.label}</div><div class="b">${c.n}</div><div class="muted">bax →</div></div>`).join('')}</div></div>`+
+   `<div class="grid2">
+     <div class="panel"><h2>💰 Qiymət aralığı <span class="small">(klik→filtr)</span></h2>${cbars(bd.c,bd.ord,k=>k+' ₼','band')}</div>
+     <div class="panel"><h2>🏷 Brend <span class="small">(klik→filtr)</span></h2>${cbars(countBy(scored,'brand'),null,x=>x,'brand',10)}</div></div>`+
+   `<div class="grid2">
+     <div class="panel"><h2>🎮 İstifadə <span class="small">(klik→filtr)</span></h2>${cbars(usageC,['Gaming','Ofis / Gündəlik'],k=>k==='Gaming'?'🎮 Gaming':'💼 Ofis','usage')}</div>
+     <div class="panel"><h2>🔄 Vəziyyət <span class="small">(klik→filtr)</span></h2>${cbars(condC,['Yeni','İkinci əl'],x=>x,'cond')}</div></div>`+
+   `<div class="panel"><h2>💰 Büdcəyə görə ən yaxşı parametrlər <span class="small">— hər qiymət aralığında ən güclü konfiqurasiya</span></h2>
+     <div class="tblwrap" style="max-height:420px"><table><thead><tr><th>Qiymət aralığı</th><th>Model</th><th>Parametrlər</th><th>Video kart</th><th>Qiymət</th><th>Dəyər</th></tr></thead><tbody>${bpbRows}</tbody></table></div></div>`+
+   `<h2 style="margin:22px 4px 8px">🎯 Parametrə görə ən yaxşı qiymətdə məhsullar</h2>
+    <div class="grid2">${cheapCard('RAM','ram',true,' GB')}${cheapCard('CPU ailəsi','cpu_fam',false)}</div>
+    <div class="grid2">${cheapCard('Yaddaş','storage',false)}${cheapCard('Video kart','gpu',false)}</div>`;
+  bindCbars();
  } else if(v==='best'){
   title='⭐ Ən uyğun modellər';sub='hər kateqoriya üçün ən yaxşı dəyər';
   let hInner='';
