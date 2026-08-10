@@ -22,6 +22,8 @@
 
 **Büdcə tabı universal edildi** — əvvəl `value_score!=null` tələb edirdi (aksesuar/ofis-də scored=0 → boş). İndi `+r.price>=1`: scored kateqoriyalarda keyfiyyət filtri + Güc barı saxlanır, spec-siz kateqoriyalarda bütün məhsullar ən ucuzdan. `<1₼` küy (metrlə kabel) süzülür. **⚠️ Aksesuar/Ofis-də value_score/spec_score YOXDUR** (enrich onlara skor vermir — spec parse olunmur) → yalnız Cədvəl+Büdcə mənalıdır.
 
+**Büdcə tabında alt-kateqoriya ayrımı** (`state.budgetSub`/`bindBudgetSub`) — çox-alt-kateqoriyalı kateqoriyalarda (Komponent/Monitor 12 alt-kat, Masaüstü 5) əvvəl bütün alt-katlar qiymət aralığında qarışırdı (monitor+SSD+GPU eyni banda — mənasız). İndi **📂 alt-kateqoriya çip seçici**, default **ən böyük alt-kat** (Monitor), «🔀 Hamısı» ilə qarışıq. Hər alt-kat homogen aralıqlar + öz Güc barı (monitor var, keys yox). `filtersBar(,,hideSub)` bu görünüşdə sub dropdown gizli. Tək-alt-kateqoriyalı (noutbuk) → seçici yoxdur.
+
 ---
 
 ## 🟢 Canlıda nə var
