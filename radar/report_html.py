@@ -147,6 +147,7 @@ a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
 .pgrid .pv{font-weight:800;font-size:12px;white-space:nowrap}.pgrid .pv small{color:var(--muted);font-weight:600;margin-left:4px;font-size:10px}
 .pgrid .pm{color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .pgrid .pp{color:var(--good);font-weight:800;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bandpager{display:flex;gap:6px;align-items:center;justify-content:flex-end;padding:10px 2px 0}
 .mtoggle{display:none}@media(max-width:900px){.mtoggle{display:inline-block}}
 </style></head><body>
 <div class="app">
@@ -175,7 +176,7 @@ let STAR=store.get();
 $('#brsub').textContent=`${META.n_total} elan · ${META.n_new} 🆕 · ${META.run_ts.slice(0,10)}`;
 
 const state={view:'overview',cat:'',sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,q:'',
- pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1,page:0,ps:50,catTab:'table'};
+ pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1,page:0,ps:50,catTab:'table',bandPages:{}};
 function distinct(field,cat){const s=new Set();DATA.forEach(r=>{if(cat&&r.category!==cat)return;const v=r[field];if(v!=null&&v!=='')s.add(v);});return [...s];}
 
 // ---------- navigation ----------
@@ -475,6 +476,47 @@ function catAnalysis(cat){
  });
  return out||'<div class="panel muted">Bu seçim üçün data yoxdur.</div>';
 }
+// Budget browser — each 200₼ range as its own paginated panel. Defaults to «Yeni» condition (used → Vəziyyət filter).
+function budgetView(cat){
+ const sig=JSON.stringify([state.cat,state.sub,state.cond,state.seller,state.usage,state.brand,state.pmin,state.pmax,state.onlyNew,state.pram,state.pcpu,state.pcgen,state.pcser,state.pstor,state.pscr,state.pgpu,state.q,state.sortKey,state.sortDir]);
+ if(state._bsig!==sig){state.bandPages={};state._bsig=sig;}
+ let base=filtered(DATA,!state.sub).filter(r=>r.value_score!=null);
+ if(!state.cond)base=base.filter(r=>r.condition==='Yeni'); // default: yalnız «Yeni»; köhnə (İkinci əl) → Vəziyyət filtri
+ const g={};base.forEach(r=>{const b=band200(r.price);if(!b)return;(g[b]=g[b]||[]).push(r);});
+ const bands=Object.keys(g).sort((a,b)=>(a==='2000+'?1e9:parseInt(a))-(b==='2000+'?1e9:parseInt(b)));
+ const note=`<div class="panel" style="padding:10px 14px;margin-bottom:12px"><span class="small">💡 Bu görünüş standart olaraq <b>yalnız «Yeni» vəziyyətli</b> məhsulları göstərir — işlənmişlər üçün yuxarıdakı <b>Vəziyyət</b> filtrini «İkinci əl» seç. Hər aralıq ayrıca səhifələnir.</span></div>`;
+ if(!bands.length)return note+'<div class="panel muted">Bu seçim üçün məhsul yoxdur.</div>';
+ const maxSpec=Math.max(1,...base.map(r=>r.spec_score||0));
+ const PS=15;
+ const bhead=`<thead><tr><th>Model</th><th>Qiymət</th><th>Güc</th><th>Vəziyyət</th><th>Satıcı</th><th>Telefon</th></tr></thead>`;
+ let out=note;
+ bands.forEach(b=>{
+  const items=sortRows(g[b]);
+  const pages=Math.max(1,Math.ceil(items.length/PS));
+  let pg=state.bandPages[b]||0;if(pg>=pages)pg=pages-1;if(pg<0)pg=0;
+  const slice=items.slice(pg*PS,pg*PS+PS);
+  const wp=items.filter(r=>r.price);const avg=wp.length?wp.reduce((a,c)=>a+c.price,0)/wp.length:0;
+  const rows=slice.map(r=>{const sp=r.spec_score||0,pct=Math.max(4,Math.round(sp/maxSpec*100));
+   return `<tr>
+    <td><a href="${esc(r.link)}" target="_blank">${esc((r.name||'').slice(0,52))}</a>${r.new?' <span class="tg new">🆕</span>':''}${specChips(r)}</td>
+    <td class="num"><b>${fmt(r.price)} ₼</b></td>
+    <td><div class="pwwrap"><div class="pw"><i style="width:${pct}%"></i></div><span class="pwn">${pct}</span></div></td>
+    <td class="small">${esc(r.condition||'')}</td>
+    <td class="${r.seller_type==='Mağaza'?'shop':'priv'}">${esc(r.seller_type||'')}</td>
+    <td class="small">${esc(r.phones||'')}</td></tr>`;}).join('');
+  const pager=pages>1?`<div class="bandpager" data-band="${esc(b)}">
+     <button class="pg" data-bp="prev" ${pg===0?'disabled':''}>‹ Əvvəl</button>
+     <span class="pgmeta">Səhifə ${pg+1} / ${pages}</span>
+     <button class="pg" data-bp="next" ${pg>=pages-1?'disabled':''}>Sonra ›</button></div>`:'';
+  out+=`<div class="panel"><div class="an-head"><h2>💰 ${esc(b)} ₼</h2>
+     <div class="an-stats"><b>${fmt(items.length)}</b> məhsul · orta <b>${fmt(avg)} ₼</b> · <b>${pg*PS+1}–${Math.min(items.length,pg*PS+PS)}</b> göstərilir</div></div>
+    <table>${bhead}<tbody>${rows}</tbody></table>${pager}</div>`;
+ });
+ return out;
+}
+function bindBandPagers(){$('#root').querySelectorAll('.bandpager').forEach(bp=>{const band=bp.dataset.band;
+ bp.querySelectorAll('.pg').forEach(btn=>{if(btn.hasAttribute('disabled'))return;btn.onclick=()=>{
+  const cur=state.bandPages[band]||0;state.bandPages[band]=cur+(btn.dataset.bp==='next'?1:-1);render();};});});}
 function render1(){
  const root=$('#root');const v=state.view;
  let title='İcmal',sub='';
@@ -514,12 +556,17 @@ function render1(){
   const cm=META.cats.find(c=>c.slug===state.cat);title=cm?cm.label:'Bütün elanlar';
   const fr=filtered(DATA);
   const tabs=cm?`<div class="subtabs">
-    <button class="stab ${state.catTab!=='analiz'?'on':''}" data-tab="table">📋 Cədvəl</button>
+    <button class="stab ${state.catTab==='table'?'on':''}" data-tab="table">📋 Cədvəl</button>
+    <button class="stab ${state.catTab==='budget'?'on':''}" data-tab="budget">💰 Büdcə üzrə</button>
     <button class="stab ${state.catTab==='analiz'?'on':''}" data-tab="analiz">📊 Alt-kateqoriya analizi</button></div>`:'';
   if(cm&&state.catTab==='analiz'){
    sub=`${fr.length} nəticə · alt-kateqoriyalar üzrə ən yaxşılar`;
    root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}</div>`+catAnalysis(state.cat);
    bindFilters();bindSubtabs();
+  } else if(cm&&state.catTab==='budget'){
+   sub=`hər qiymət aralığı ayrıca · yalnız «Yeni»`;
+   root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}</div>`+budgetView(state.cat);
+   bindFilters();bindSubtabs();bindBandPagers();
   } else {
    const rows=sortRows(fr);sub=`${rows.length} nəticə`;
    root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}<div class="tblwrap">${tableHTML(rows)}</div>${pager(rows.length)}</div>`;
