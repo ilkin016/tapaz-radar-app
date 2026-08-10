@@ -13,6 +13,15 @@
 - Bütün panel sətirləri: spec çiplər + Güc barı + qiymət + vəziyyət + satıcı + telefon.
 - **Vəziyyət seçici (condMode)** Büdcə + Parametr tablarında — seqment toggle: **🆕 Yalnız Yeni · 🔀 Yeni + İkinci əl (qarışıq) · ♻️ Yalnız İkinci əl** (`condModeBar`/`applyCondMode`/`bindCondMode`, default 'yeni'). Bu görünüşlərdə filter-bar-dakı Vəziyyət dropdown gizlənir (`filtersBar(true,true)` + `filtered(...,skipCond)`), toggle onu əvəz edir — təkrar yox.
 
+**📌 Tab-ların kateqoriya üzrə uyğunluğu (yoxlanıldı):**
+| Kateqoriya | Cədvəl | Büdcə | Parametr (CPU/RAM/VGA) | Alt-kat analizi |
+|---|---|---|---|---|
+| Noutbuklar, Komputerlər | ✅ | ✅ (Güc barı) | ✅ struktur sahələr | ✅ |
+| Komponent/Monitor | ✅ | ✅ (yarısı skorlu) | ⚠️ boş → analiz tabına yönləndirir | ✅ (compKey) |
+| Aksesuarlar, Ofis | ✅ | ✅ (spec yox → Güc «—», ən ucuz sıra) | ⚠️ boş | sınıq/mənasız (spec yox) |
+
+**Büdcə tabı universal edildi** — əvvəl `value_score!=null` tələb edirdi (aksesuar/ofis-də scored=0 → boş). İndi `+r.price>=1`: scored kateqoriyalarda keyfiyyət filtri + Güc barı saxlanır, spec-siz kateqoriyalarda bütün məhsullar ən ucuzdan. `<1₼` küy (metrlə kabel) süzülür. **⚠️ Aksesuar/Ofis-də value_score/spec_score YOXDUR** (enrich onlara skor vermir — spec parse olunmur) → yalnız Cədvəl+Büdcə mənalıdır.
+
 ---
 
 ## 🟢 Canlıda nə var
