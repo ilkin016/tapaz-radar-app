@@ -1,7 +1,22 @@
 #!/usr/bin/env python3
 """Interactive single-page dashboard (self-contained, vanilla JS). Fast filter/sort, views, shortlists."""
-import json, html
+import json, html, re
 from collections import Counter
+
+_GAMING_MON_KW = re.compile(r"gaming|oyun|curved|\brog\b|\btuf\b|odyssey|predator|\bnitro\b|\bmag\b|aorus|g.?sync|freesync|\bvg\d|\bxg\b", re.I)
+
+
+def _monitor_usage(name, params):
+    """Monitoru Gaming (≥100Hz və ya gaming işarələri) vs Ofis olaraq təsnif et."""
+    text = (name or "") + " " + (params or "")
+    m = re.search(r"(\d{2,3})\s*hz", text, re.I)
+    hz = int(m.group(1)) if m else 0
+    if hz >= 100:
+        return "Gaming"
+    if 0 < hz <= 75:
+        return "Ofis / Gündəlik"
+    return "Gaming" if _GAMING_MON_KW.search(text) else "Ofis / Gündəlik"
+
 
 CAT_LABELS = {
     "noutbuklar": "💻 Noutbuklar",
@@ -21,6 +36,8 @@ def build_html(listings, new_now, run_ts, path, public=False):
     data = []
     for r in listings:
         d = {k: r.get(k) for k in keys}
+        if r.get("category") == "komputer-avadanliqi" and r.get("subcategory") == "Monitor":
+            d["usage"] = _monitor_usage(r.get("name"), r.get("params"))  # monitorları Gaming/Ofis-ə ayır
         if public:
             d["phones"] = ""  # do not expose seller phone numbers on a public URL
         d["new"] = 1 if r["ad_id"] in new_ids else 0
@@ -439,6 +456,7 @@ function specChips(r){let c=[];
   if(r.screen)c.push(['scr',r.screen+'″']);
  } else if(r.params){c=r.params.split(/[·,]/).map(s=>s.trim()).filter(Boolean).slice(0,5).map(s=>['scr',s]);}
  return c.length?'<div class="chips">'+c.map(x=>`<span class="spec ${x[0]}">${esc(x[1])}</span>`).join('')+'</div>':'';}
+function usageTag(r){return r.usage==='Gaming'?'<span class="tg g">🎮 Gaming</span>':(r.usage==='Ofis / Gündəlik'?'<span class="tg o">💼 Ofis</span>':'');}
 const PICON={'RAM':'🧠','CPU':'⚙️','Yaddaş':'💾','Video kart':'🎮','Ekran':'🖥️','Tutum':'💾','Model':'🎮','Ölçü':'🖥️','Təzələnmə':'🔄','Parametr':'🔧'};
 function catAnalysis(cat){
  const base=filtered(DATA,!state.sub);
@@ -512,7 +530,7 @@ function budgetView(cat){
   const wp=items.filter(r=>r.price);const avg=wp.length?wp.reduce((a,c)=>a+c.price,0)/wp.length:0;
   const rows=slice.map(r=>{const guc=(scoredCat&&r.spec_score)?`<div class="pwwrap"><div class="pw"><i style="width:${Math.max(4,Math.round(r.spec_score/maxSpec*100))}%"></i></div><span class="pwn">${Math.round(r.spec_score/maxSpec*100)}</span></div>`:'<span class="small">—</span>';
    return `<tr>
-    <td><a href="${esc(r.link)}" target="_blank">${esc((r.name||'').slice(0,52))}</a>${r.new?' <span class="tg new">🆕</span>':''}${specChips(r)}</td>
+    <td><a href="${esc(r.link)}" target="_blank">${esc((r.name||'').slice(0,52))}</a>${r.new?' <span class="tg new">🆕</span>':''} ${usageTag(r)}${specChips(r)}</td>
     <td class="num"><b>${fmt(r.price)} ₼</b></td>
     <td>${guc}</td>
     <td class="small">${esc(r.condition||'')}</td>
@@ -560,7 +578,7 @@ function paramView(cat){
   const label=dim==='ram'?(v+' GB'):v;
   const rows=slice.map(r=>{const sp=r.spec_score||0,pct=Math.max(4,Math.round(sp/maxSpec*100));
    return `<tr>
-    <td><a href="${esc(r.link)}" target="_blank">${esc((r.name||'').slice(0,52))}</a>${r.new?' <span class="tg new">🆕</span>':''}${specChips(r)}</td>
+    <td><a href="${esc(r.link)}" target="_blank">${esc((r.name||'').slice(0,52))}</a>${r.new?' <span class="tg new">🆕</span>':''} ${usageTag(r)}${specChips(r)}</td>
     <td class="num"><b>${fmt(r.price)} ₼</b></td>
     <td><div class="pwwrap"><div class="pw"><i style="width:${pct}%"></i></div><span class="pwn">${pct}</span></div></td>
     <td class="small">${esc(r.condition||'')}</td>
