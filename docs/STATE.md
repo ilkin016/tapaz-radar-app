@@ -11,6 +11,7 @@
 - **«💰 Büdcə üzrə»** (`budgetView`) — hər 200₼ aralıq **öz panelində**, **15 məhsul/səhifə + per-aralıq müstəqil pagination** (`bindBandPagers`/`state.bandPages`, filtr dəyişəndə imza `_bsig` ilə avto-reset). Standart olaraq **yalnız «Yeni» vəziyyət** (işlənmişlər Vəziyyət filtri «İkinci əl» ilə).
 - **«🎯 Parametr üzrə»** (`paramView`/`bindParamSel`/`state.paramTab`) — **CPU/RAM/VGA** seçicisi; hər parametr dəyəri öz panelində (RAM: r.ram 64→2GB; CPU: r.cpu_fam; VGA: r.gpu top-40 saya görə). Hər qrupda məhsullar **ən ucuzdan bahalıya**, 15/səhifə müstəqil pagination (state.bandPages `p|dim|val` açarları ilə paylaşılır). Yalnız struktur sahələr (noutbuk/masaüstü).
 - Bütün panel sətirləri: spec çiplər + Güc barı + qiymət + vəziyyət + satıcı + telefon.
+- **Vəziyyət seçici (condMode)** Büdcə + Parametr tablarında — seqment toggle: **🆕 Yalnız Yeni · 🔀 Yeni + İkinci əl (qarışıq) · ♻️ Yalnız İkinci əl** (`condModeBar`/`applyCondMode`/`bindCondMode`, default 'yeni'). Bu görünüşlərdə filter-bar-dakı Vəziyyət dropdown gizlənir (`filtersBar(true,true)` + `filtered(...,skipCond)`), toggle onu əvəz edir — təkrar yox.
 
 ---
 
