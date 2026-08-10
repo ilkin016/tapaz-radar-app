@@ -151,7 +151,7 @@ let STAR=store.get();
 $('#brsub').textContent=`${META.n_total} elan · ${META.n_new} 🆕 · ${META.run_ts.slice(0,10)}`;
 
 const state={view:'overview',cat:'',sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,q:'',
- pram:'',pcpu:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1,page:0,ps:50,catTab:'table'};
+ pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1,page:0,ps:50,catTab:'table'};
 function distinct(field,cat){const s=new Set();DATA.forEach(r=>{if(cat&&r.category!==cat)return;const v=r[field];if(v!=null&&v!=='')s.add(v);});return [...s];}
 
 // ---------- navigation ----------
@@ -169,7 +169,7 @@ function buildNav(){
 }
 function go(k){
  if(k.startsWith('cat:')){state.view='table';state.cat=k.slice(4);state.catTab='table';
-  Object.assign(state,{sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,pram:'',pcpu:'',pstor:'',pscr:'',pgpu:''});}
+  Object.assign(state,{sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:''});}
  else {state.view=k;if(k!=='table')state.cat='';}
  state.page=0;
  [...$('#nav').children].forEach(b=>b.classList&&b.classList.toggle('on',b.dataset&&b.dataset.k===k));
@@ -188,6 +188,8 @@ function filtered(base,skipSub){
   if(state.brand&&r.brand!==state.brand)return false;
   if(state.pram&&(''+r.ram)!==state.pram)return false;
   if(state.pcpu&&r.cpu_fam!==state.pcpu)return false;
+  if(state.pcgen&&cpuGen(r)!==state.pcgen)return false;
+  if(state.pcser&&cpuSer(r)!==state.pcser)return false;
   if(state.pstor&&r.storage!==state.pstor)return false;
   if(state.pscr&&(''+r.screen)!==state.pscr)return false;
   if(state.pgpu==='__has'&&!r.gpu)return false;
@@ -269,10 +271,14 @@ function filtersBar(withCat){
   return `<select id="${id}"><option value="">${label}: hamısı</option>`+vals.map(v=>`<option value="${esc(''+v)}" ${cur===(''+v)?'selected':''}>${esc(''+v)}${suffix}</option>`).join('')+`</select>`;};
  const gpuVals=distinct('gpu',cat).sort((a,b)=>(''+a).localeCompare(''+b));
  const gpuSel=gpuVals.length?`<select id="f_pgpu"><option value="">Video kart: hamısı</option><option value="__has" ${state.pgpu==='__has'?'selected':''}>✓ var (diskret)</option><option value="__no" ${state.pgpu==='__no'?'selected':''}>— yox</option>${gpuVals.map(v=>`<option value="${esc(v)}" ${state.pgpu===v?'selected':''}>${esc(v)}</option>`).join('')}</select>`:'';
+ const pselFn=(id,fn,label,cur)=>{let vals=distinctFn(fn,cat);if(!vals.length)return '';vals.sort((a,b)=>(''+a).localeCompare(''+b,'az',{numeric:true}));
+  return `<select id="${id}"><option value="">${label}: hamısı</option>`+vals.map(v=>`<option value="${esc(v)}" ${cur===v?'selected':''}>${esc(v)}</option>`).join('')+`</select>`;};
  const paramRow=`<div class="controls" style="margin-top:-4px">
   <span class="small" style="align-self:center;font-weight:700">⚙️ Parametrlər:</span>
   ${psel('f_pram','ram','RAM',state.pram,true,' GB')}
   ${psel('f_pcpu','cpu_fam','CPU',state.pcpu,false)}
+  ${pselFn('f_pcgen',cpuGen,'Nəsil',state.pcgen)}
+  ${pselFn('f_pcser',cpuSer,'Seriya',state.pcser)}
   ${psel('f_pstor','storage','Yaddaş',state.pstor,false)}
   ${psel('f_pscr','screen','Ekran',state.pscr,true,'"')}
   ${gpuSel}
@@ -297,16 +303,16 @@ function filtersBar(withCat){
 }
 function bindFilters(){
  const set=(id,key)=>{const e=$('#'+id);if(e)e.onchange=()=>{state[key]=e.value;state.page=0;
-  if(key==='cat')Object.assign(state,{sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,pram:'',pcpu:'',pstor:'',pscr:'',pgpu:'',catTab:'table'});render();};};
+  if(key==='cat')Object.assign(state,{sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:'',catTab:'table'});render();};};
  set('f_cat','cat');set('f_sub','sub');set('f_usage','usage');set('f_cond','cond');set('f_seller','seller');set('f_brand','brand');
- set('f_pram','pram');set('f_pcpu','pcpu');set('f_pstor','pstor');set('f_pscr','pscr');set('f_pgpu','pgpu');
+ set('f_pram','pram');set('f_pcpu','pcpu');set('f_pcgen','pcgen');set('f_pcser','pcser');set('f_pstor','pstor');set('f_pscr','pscr');set('f_pgpu','pgpu');
  const pn=$('#f_pmin'),px=$('#f_pmax');if(pn)pn.oninput=()=>{state.pmin=pn.value;state.page=0;render();};if(px)px.oninput=()=>{state.pmax=px.value;state.page=0;render();};
  const fn=$('#f_new');if(fn)fn.onchange=()=>{state.onlyNew=fn.checked;state.page=0;render();};
  $('#root').querySelectorAll('.qs button').forEach(b=>b.onclick=()=>{const s=b.dataset.sort;
   if(s==='price_asc'){state.sortKey='price';state.sortDir=1;}else if(s==='price_desc'){state.sortKey='price';state.sortDir=-1;}
   else{state.sortKey='value_score';state.sortDir=-1;}state.page=0;render();});
  const cl=$('#f_clear');if(cl)cl.onclick=()=>{Object.assign(state,{sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,
-  pram:'',pcpu:'',pstor:'',pscr:'',pgpu:'',page:0});render();};
+  pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:'',page:0});render();};
  [['f_usage','usage'],['f_cond','cond'],['f_seller','seller']].forEach(([id,k])=>{const e=$('#'+id);if(e)e.value=state[k];});
 }
 
@@ -342,29 +348,39 @@ function kpiStrip(rows){
   ${K('🏪 Mağaza',sh)}${K('🎮 Gaming',g)}${K('💼 Ofis',o)}</div>`;
 }
 
-function bandDist(scored){const c={};scored.forEach(r=>{if(!r.band)return;let b=r.band;if((parseInt(b)||0)>=2000)b='2000+';c[b]=(c[b]||0)+1;});
+// 200-AZN price buckets (istifadəçi: intervallar 200 ₼ səviyyəsində). ≥2000 → "2000+".
+function band200(price){if(price==null||price==='')return null;const w=200;if(price>=2000)return '2000+';const lo=Math.floor(price/w)*w;return lo+'–'+(lo+w);}
+function bandDist(scored){const c={};scored.forEach(r=>{const b=band200(r.price);if(!b)return;c[b]=(c[b]||0)+1;});
  const ord=Object.keys(c).sort((a,b)=>(a==='2000+'?1e9:parseInt(a))-(b==='2000+'?1e9:parseInt(b)));return {c,ord};}
 function cbars(counter,order,fmtk,type,limit){let items=(order||Object.keys(counter).sort((a,b)=>counter[b]-counter[a]));if(limit)items=items.slice(0,limit);
  const mx=Math.max(1,...items.map(k=>counter[k]));
  return '<div class="bars">'+items.map(k=>`<div class="bar cbar" data-type="${type}" data-val="${esc(''+k)}"><span>${esc(fmtk(k))}</span><span class="bt"><i style="width:${Math.round(counter[k]/mx*100)}%"></i></span><span class="bv">${counter[k]}</span></div>`).join('')+'</div>';}
-function pick(type,val){Object.assign(state,{cat:'',sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',pram:'',pcpu:'',pstor:'',pscr:'',pgpu:'',onlyNew:false,page:0,catTab:'table'});
+function pick(type,val){Object.assign(state,{cat:'',sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:'',onlyNew:false,page:0,catTab:'table'});
  if(type==='brand')state.brand=val; else if(type==='usage')state.usage=val; else if(type==='cond')state.cond=val;
  else if(type==='band'){const m=(''+val).match(/\d+/g);if(m){state.pmin=m[0];state.pmax=(''+val).includes('+')?'':(m[1]||'');}}
  else if(type==='ram')state.pram=val; else if(type==='cpu')state.pcpu=val; else if(type==='storage')state.pstor=val; else if(type==='gpu')state.pgpu=val;
  state.view='table';[...$('#nav').children].forEach(b=>b.classList&&b.classList.remove('on'));render();window.scrollTo(0,0);}
 function bindCbars(){$('#root').querySelectorAll('.cbar').forEach(b=>b.onclick=()=>pick(b.dataset.type,b.dataset.val));}
-function bestPerBand(){const scored=DATA.filter(r=>r.value_score!=null);const g={};scored.forEach(r=>{(g[r.band]=g[r.band]||[]).push(r);});
- return Object.keys(g).sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)).map(b=>({band:b,n:g[b].length,best:g[b].slice().sort((x,y)=>(y.spec_score||0)-(x.spec_score||0))[0]}));}
-function cheapestPerParam(field,numeric){const scored=DATA.filter(r=>r.value_score!=null && r.price && r[field]!=null && r[field]!=='');const g={};scored.forEach(r=>{(g[r[field]]=g[r[field]]||[]).push(r);});
- let ks=Object.keys(g);ks.sort(numeric?((a,b)=>b-a):((a,b)=>g[b].length-g[a].length));
- return ks.map(k=>({val:k,n:g[k].length,cheap:g[k].slice().sort((a,b)=>a.price-b.price)[0]}));}
+// CPU nəsil (generation) + seriya (suffix) — cpu mətnindən parse, hər sətir üçün keşlənir.
+const VALID_SUF=/^(U|H|HX|HK|HS|HQ|G|K|KF|KS|F|T|P|Y|M|MQ|QM|X|XT|GE|E)$/i;
+function _cpuCompute(r){const cpu=(r.cpu||'');let gen='',ser='',m,apple=false;
+ if(/apple|\bM[1-4]\b/i.test(cpu)&&(m=cpu.match(/\bM([1-4])\b/i))){apple=true;gen='Apple M'+m[1];const s=(cpu.match(/\b(Pro|Max|Ultra)\b/i)||[])[1];ser=s?s[0].toUpperCase()+s.slice(1).toLowerCase():'';}
+ else if((m=cpu.match(/i[3579]-(\d{3,5})([A-Za-z]{0,3})/i))){const num=m[1];ser=(m[2]||'').toUpperCase();
+  let g;if(num.length>=5)g=num.slice(0,2);else if(num[0]==='1'&&num.length===4)g=num.slice(0,2);else g=num.slice(0,1);gen='Intel '+g+'-ci nəsil';}
+ else if((m=cpu.match(/Core\s+(?:Ultra\s+)?[3579]\s+(\d{3})([A-Za-z]{0,3})/i))){ser=(m[2]||'').toUpperCase();gen='Intel Core Ultra Seriya '+m[1][0];}
+ else if((m=cpu.match(/Ryzen\s+(?:AI\s+)?[3579]\s+(\d{3,4})([A-Za-z]{0,3})/i))){const num=m[1];ser=(m[2]||'').toUpperCase();gen='Ryzen '+(num.length===4?num[0]+'000':num[0]+'00')+' seriya';}
+ if(!apple&&!VALID_SUF.test(ser))ser=''; // drop mis-captured suffixes (GB, UU, SS…)
+ r.__cg=gen;r.__cs=ser;}
+function cpuGen(r){if(r.__cg===undefined)_cpuCompute(r);return r.__cg;}
+function cpuSer(r){if(r.__cs===undefined)_cpuCompute(r);return r.__cs;}
+function distinctFn(fn,cat){const s=new Set();DATA.forEach(r=>{if(cat&&r.category!==cat)return;const v=fn(r);if(v)s.add(v);});return [...s];}
 function render(){
  $('#q').oninput=()=>{state.q=$('#q').value;state.page=0;render1();};
  render1();
 }
 // ---------- per-category / per-subcategory analysis ----------
-function bestBandsFor(rows){const g={};rows.forEach(r=>{if(!r.band)return;(g[r.band]=g[r.band]||[]).push(r);});
- return Object.keys(g).sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)).map(b=>({band:b,n:g[b].length,best:g[b].slice().sort((x,y)=>(y.spec_score||0)-(x.spec_score||0))[0]}));}
+function bestBandsFor(rows){const g={};rows.forEach(r=>{const b=band200(r.price);if(!b)return;(g[b]=g[b]||[]).push(r);});
+ return Object.keys(g).sort((a,b)=>(a==='2000+'?1e9:parseInt(a))-(b==='2000+'?1e9:parseInt(b))).map(b=>({band:b,n:g[b].length,best:g[b].slice().sort((x,y)=>(y.spec_score||0)-(x.spec_score||0))[0]}));}
 function relevantParams(rows){const cand=[['ram','RAM',true,' GB'],['cpu_fam','CPU',false,''],['storage','Yaddaş',false,''],['gpu','Video kart',false,''],['screen','Ekran',true,'″']];
  const n=rows.length;return cand.filter(c=>rows.filter(r=>r[c[0]]!=null&&r[c[0]]!=='').length>=Math.max(3,n*0.12));}
 function cheapestForField(rows,field,numeric){const g={};rows.forEach(r=>{if(!r.price||r[field]==null||r[field]==='')return;(g[r[field]]=g[r[field]]||[]).push(r);});
@@ -432,26 +448,15 @@ function render1(){
   const bd=bandDist(scored);
   const usageC={'Gaming':scored.filter(r=>r.usage==='Gaming').length,'Ofis / Gündəlik':scored.filter(r=>r.usage==='Ofis / Gündəlik').length};
   const condC=countBy(scored,'condition');
-  const bpbRows=bestPerBand().map(x=>`<tr><td><b>${esc(x.band)} ₼</b><div class="small">${x.n} elan</div></td>
-    <td><a href="${esc(x.best.link)}" target="_blank">${esc(x.best.name)}</a>${x.best.new?' <span class="tg new">🆕</span>':''}</td>
-    <td class="small">${esc(x.best.params)}</td>${x.best.gpu?`<td><b style="color:#7e22ce">${esc(x.best.gpu)}</b></td>`:'<td class="small">—</td>'}
-    <td class="num">${fmt(x.best.price)} ₼</td><td class="num"><span class="val" style="${valColor(x.best.value_score)}">${x.best.value_score}</span></td></tr>`).join('');
-  const cheapCard=(t,field,numeric,suffix='')=>{const rows=cheapestPerParam(field,numeric).slice(0,12).map(x=>`<tr><td><b>${esc(''+x.val)}${suffix}</b><span class="small"> (${x.n})</span></td>
-      <td class="num shop"><b>${fmt(x.cheap.price)} ₼</b></td><td><a href="${esc(x.cheap.link)}" target="_blank">${esc((x.cheap.name||'').slice(0,32))}</a><div class="small">${esc(x.cheap.seller_type)}</div></td></tr>`).join('');
-    return `<div class="panel"><h2>${t} — ən yaxşı qiymət</h2><table><thead><tr><th>Dəyər</th><th>Ən ucuz</th><th>Model</th></tr></thead><tbody>${rows}</tbody></table></div>`;};
   root.innerHTML=kpiStrip(DATA)+
-   `<div class="panel"><h2>Kateqoriyalar <span class="small">— klikləyib bax</span></h2><div class="catcards">${META.cats.map(c=>`<div class="catcard" onclick="go('cat:${c.slug}')"><div>${c.label}</div><div class="b">${c.n}</div><div class="muted">bax →</div></div>`).join('')}</div></div>`+
+   `<div class="panel"><h2>Kateqoriyalar <span class="small">— klikləyib bax · hər kateqoriyada «📊 Alt-kateqoriya analizi» tabı</span></h2><div class="catcards">${META.cats.map(c=>`<div class="catcard" onclick="go('cat:${c.slug}')"><div>${c.label}</div><div class="b">${c.n}</div><div class="muted">bax →</div></div>`).join('')}</div></div>`+
    `<div class="grid2">
-     <div class="panel"><h2>💰 Qiymət aralığı <span class="small">(klik→filtr)</span></h2>${cbars(bd.c,bd.ord,k=>k+' ₼','band')}</div>
+     <div class="panel"><h2>💰 Qiymət aralığı <span class="small">(200 ₼ · klik→filtr)</span></h2>${cbars(bd.c,bd.ord,k=>k+' ₼','band')}</div>
      <div class="panel"><h2>🏷 Brend <span class="small">(klik→filtr)</span></h2>${cbars(countBy(scored,'brand'),null,x=>x,'brand',10)}</div></div>`+
    `<div class="grid2">
      <div class="panel"><h2>🎮 İstifadə <span class="small">(klik→filtr)</span></h2>${cbars(usageC,['Gaming','Ofis / Gündəlik'],k=>k==='Gaming'?'🎮 Gaming':'💼 Ofis','usage')}</div>
      <div class="panel"><h2>🔄 Vəziyyət <span class="small">(klik→filtr)</span></h2>${cbars(condC,['Yeni','İkinci əl'],x=>x,'cond')}</div></div>`+
-   `<div class="panel"><h2>💰 Büdcəyə görə ən yaxşı parametrlər <span class="small">— hər qiymət aralığında ən güclü konfiqurasiya</span></h2>
-     <div class="tblwrap" style="max-height:420px"><table><thead><tr><th>Qiymət aralığı</th><th>Model</th><th>Parametrlər</th><th>Video kart</th><th>Qiymət</th><th>Dəyər</th></tr></thead><tbody>${bpbRows}</tbody></table></div></div>`+
-   `<h2 style="margin:22px 4px 8px">🎯 Parametrə görə ən yaxşı qiymətdə məhsullar</h2>
-    <div class="grid2">${cheapCard('RAM','ram',true,' GB')}${cheapCard('CPU ailəsi','cpu_fam',false)}</div>
-    <div class="grid2">${cheapCard('Yaddaş','storage',false)}${cheapCard('Video kart','gpu',false)}</div>`;
+   `<div class="panel muted" style="text-align:center;line-height:1.6">💡 <b>«Büdcəyə görə ən yaxşı parametrlər»</b> və <b>«parametrə görə ən ucuz məhsullar»</b> artıq hər kateqoriyanın <b>«📊 Alt-kateqoriya analizi»</b> tabındadır — hər alt-kateqoriya ayrıca. Yuxarıdakı kateqoriyaya klikləyib bax.</div>`;
   bindCbars();
  } else if(v==='best'){
   title='⭐ Ən uyğun modellər';sub='hər kateqoriya üçün ən yaxşı dəyər';
