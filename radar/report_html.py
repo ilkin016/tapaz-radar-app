@@ -176,7 +176,7 @@ let STAR=store.get();
 $('#brsub').textContent=`${META.n_total} elan · ${META.n_new} 🆕 · ${META.run_ts.slice(0,10)}`;
 
 const state={view:'overview',cat:'',sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,q:'',
- pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1,page:0,ps:50,catTab:'table',bandPages:{}};
+ pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1,page:0,ps:50,catTab:'table',bandPages:{},paramTab:'ram'};
 function distinct(field,cat){const s=new Set();DATA.forEach(r=>{if(cat&&r.category!==cat)return;const v=r[field];if(v!=null&&v!=='')s.add(v);});return [...s];}
 
 // ---------- navigation ----------
@@ -517,6 +517,52 @@ function budgetView(cat){
 function bindBandPagers(){$('#root').querySelectorAll('.bandpager').forEach(bp=>{const band=bp.dataset.band;
  bp.querySelectorAll('.pg').forEach(btn=>{if(btn.hasAttribute('disabled'))return;btn.onclick=()=>{
   const cur=state.bandPages[band]||0;state.bandPages[band]=cur+(btn.dataset.bp==='next'?1:-1);render();};});});}
+// Parameter browser — CPU / RAM / VGA only. Each value = its own panel with the cheapest top-15 (paginated).
+function paramView(cat){
+ const dim=state.paramTab||'ram';
+ const sig=JSON.stringify(['P',dim,state.cat,state.sub,state.cond,state.seller,state.usage,state.brand,state.pmin,state.pmax,state.onlyNew,state.pram,state.pcpu,state.pcgen,state.pcser,state.pstor,state.pscr,state.pgpu,state.q]);
+ if(state._bsig!==sig){state.bandPages={};state._bsig=sig;}
+ const sel=`<div class="controls" style="margin-bottom:12px"><span class="small" style="align-self:center;font-weight:700">Parametr növü:</span>
+   <button class="chip ${dim==='cpu'?'on':''}" data-pt="cpu">⚙️ CPU</button>
+   <button class="chip ${dim==='ram'?'on':''}" data-pt="ram">🧠 RAM</button>
+   <button class="chip ${dim==='vga'?'on':''}" data-pt="vga">🎮 VGA (Video kart)</button></div>`;
+ let base=filtered(DATA,!state.sub).filter(r=>r.value_score!=null);
+ const field=dim==='cpu'?'cpu_fam':(dim==='ram'?'ram':'gpu');
+ const g={};base.forEach(r=>{const v=r[field];if(v==null||v==='')return;(g[v]=g[v]||[]).push(r);});
+ let keys=Object.keys(g);
+ if(dim==='ram')keys.sort((a,b)=>(+b)-(+a));
+ else {keys=keys.filter(k=>g[k].length>=2).sort((a,b)=>g[b].length-g[a].length);if(dim==='vga')keys=keys.slice(0,40);}
+ if(!keys.length)return sel+'<div class="panel muted">Bu kateqoriyada CPU/RAM/VGA parametri strukturlaşmayıb (əsasən noutbuk/masaüstü üçün mövcuddur).</div>';
+ const maxSpec=Math.max(1,...base.map(r=>r.spec_score||0));const PS=15;const icon=dim==='cpu'?'⚙️':(dim==='ram'?'🧠':'🎮');
+ const bhead=`<thead><tr><th>Model</th><th>Qiymət</th><th>Güc</th><th>Vəziyyət</th><th>Satıcı</th><th>Telefon</th></tr></thead>`;
+ let out=sel+`<div class="panel" style="padding:10px 14px;margin-bottom:12px"><span class="small">💡 Seçilmiş parametrin hər dəyəri ayrıca — ən <b>sərfəli qiymətli məhsullar öndə</b> (ən ucuz → bahalı). Hər qrup müstəqil səhifələnir. Vəziyyət filtri ilə Yeni/İkinci əl daralt.</span></div>`;
+ keys.forEach(v=>{
+  const items=g[v].slice().sort((a,b)=>(a.price||1e9)-(b.price||1e9));
+  const key='p|'+dim+'|'+v;
+  const pages=Math.max(1,Math.ceil(items.length/PS));
+  let pg=state.bandPages[key]||0;if(pg>=pages)pg=pages-1;if(pg<0)pg=0;
+  const slice=items.slice(pg*PS,pg*PS+PS);
+  const wp=items.filter(r=>r.price);const avg=wp.length?wp.reduce((a,c)=>a+c.price,0)/wp.length:0;
+  const label=dim==='ram'?(v+' GB'):v;
+  const rows=slice.map(r=>{const sp=r.spec_score||0,pct=Math.max(4,Math.round(sp/maxSpec*100));
+   return `<tr>
+    <td><a href="${esc(r.link)}" target="_blank">${esc((r.name||'').slice(0,52))}</a>${r.new?' <span class="tg new">🆕</span>':''}${specChips(r)}</td>
+    <td class="num"><b>${fmt(r.price)} ₼</b></td>
+    <td><div class="pwwrap"><div class="pw"><i style="width:${pct}%"></i></div><span class="pwn">${pct}</span></div></td>
+    <td class="small">${esc(r.condition||'')}</td>
+    <td class="${r.seller_type==='Mağaza'?'shop':'priv'}">${esc(r.seller_type||'')}</td>
+    <td class="small">${esc(r.phones||'')}</td></tr>`;}).join('');
+  const pgr=pages>1?`<div class="bandpager" data-band="${esc(key)}">
+     <button class="pg" data-bp="prev" ${pg===0?'disabled':''}>‹ Əvvəl</button>
+     <span class="pgmeta">Səhifə ${pg+1} / ${pages}</span>
+     <button class="pg" data-bp="next" ${pg>=pages-1?'disabled':''}>Sonra ›</button></div>`:'';
+  out+=`<div class="panel"><div class="an-head"><h2>${icon} ${esc(label)}</h2>
+     <div class="an-stats"><b>${fmt(items.length)}</b> məhsul · ən ucuz <b>${fmt(items[0]?items[0].price:0)} ₼</b> · orta <b>${fmt(avg)} ₼</b></div></div>
+    <table>${bhead}<tbody>${rows}</tbody></table>${pgr}</div>`;
+ });
+ return out;
+}
+function bindParamSel(){$('#root').querySelectorAll('[data-pt]').forEach(b=>b.onclick=()=>{state.paramTab=b.dataset.pt;render();});}
 function render1(){
  const root=$('#root');const v=state.view;
  let title='İcmal',sub='';
@@ -558,6 +604,7 @@ function render1(){
   const tabs=cm?`<div class="subtabs">
     <button class="stab ${state.catTab==='table'?'on':''}" data-tab="table">📋 Cədvəl</button>
     <button class="stab ${state.catTab==='budget'?'on':''}" data-tab="budget">💰 Büdcə üzrə</button>
+    <button class="stab ${state.catTab==='param'?'on':''}" data-tab="param">🎯 Parametr üzrə</button>
     <button class="stab ${state.catTab==='analiz'?'on':''}" data-tab="analiz">📊 Alt-kateqoriya analizi</button></div>`:'';
   if(cm&&state.catTab==='analiz'){
    sub=`${fr.length} nəticə · alt-kateqoriyalar üzrə ən yaxşılar`;
@@ -567,6 +614,10 @@ function render1(){
    sub=`hər qiymət aralığı ayrıca · yalnız «Yeni»`;
    root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}</div>`+budgetView(state.cat);
    bindFilters();bindSubtabs();bindBandPagers();
+  } else if(cm&&state.catTab==='param'){
+   sub=`CPU / RAM / VGA üzrə ən sərfəli qiymət`;
+   root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}</div>`+paramView(state.cat);
+   bindFilters();bindSubtabs();bindParamSel();bindBandPagers();
   } else {
    const rows=sortRows(fr);sub=`${rows.length} nəticə`;
    root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}<div class="tblwrap">${tableHTML(rows)}</div>${pager(rows.length)}</div>`;
