@@ -176,7 +176,7 @@ let STAR=store.get();
 $('#brsub').textContent=`${META.n_total} elan · ${META.n_new} 🆕 · ${META.run_ts.slice(0,10)}`;
 
 const state={view:'overview',cat:'',sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,q:'',
- pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1,page:0,ps:50,catTab:'table',bandPages:{},paramTab:'ram'};
+ pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1,page:0,ps:50,catTab:'table',bandPages:{},paramTab:'ram',condMode:'yeni'};
 function distinct(field,cat){const s=new Set();DATA.forEach(r=>{if(cat&&r.category!==cat)return;const v=r[field];if(v!=null&&v!=='')s.add(v);});return [...s];}
 
 // ---------- navigation ----------
@@ -202,12 +202,12 @@ function go(k){
 }
 
 // ---------- filtering / sorting ----------
-function filtered(base,skipSub){
+function filtered(base,skipSub,skipCond){
  const q=state.q.toLowerCase();
  return base.filter(r=>{
   if(state.cat&&r.category!==state.cat)return false;
   if(!skipSub&&state.sub&&r.subcategory!==state.sub)return false;
-  if(state.cond&&r.condition!==state.cond)return false;
+  if(!skipCond&&state.cond&&r.condition!==state.cond)return false;
   if(state.seller&&r.seller_type!==state.seller)return false;
   if(state.usage&&r.usage!==state.usage)return false;
   if(state.brand&&r.brand!==state.brand)return false;
@@ -288,7 +288,7 @@ function bindTable(){
  $('#root').querySelectorAll('.star').forEach(s=>s.onclick=()=>{const id=s.dataset.id;
   if(STAR.has(id))STAR.delete(id);else STAR.add(id);store.set(STAR);render();});
 }
-function filtersBar(withCat){
+function filtersBar(withCat,hideCond){
  const subs=(state.cat&&META.subs[state.cat])||[];
  const cat=state.cat;
  const psel=(id,field,label,cur,numeric,suffix='')=>{let vals=distinct(field,cat);if(!vals.length)return '';
@@ -312,7 +312,7 @@ function filtersBar(withCat){
   ${withCat?`<select id="f_cat"><option value="">Kateqoriya: hamısı</option>${META.cats.map(c=>`<option value="${c.slug}" ${state.cat===c.slug?'selected':''}>${c.label}</option>`).join('')}</select>`:''}
   ${subs.length?`<select id="f_sub"><option value="">Alt-kateqoriya: hamısı</option>${subs.map(s=>`<option ${state.sub===s?'selected':''}>${esc(s)}</option>`).join('')}</select>`:''}
   <select id="f_usage"><option value="">İstifadə</option><option>Gaming</option><option>Ofis / Gündəlik</option></select>
-  <select id="f_cond"><option value="">Vəziyyət</option><option>Yeni</option><option>İkinci əl</option></select>
+  ${hideCond?'':`<select id="f_cond"><option value="">Vəziyyət</option><option>Yeni</option><option>İkinci əl</option></select>`}
   <select id="f_seller"><option value="">Satıcı</option><option>Mağaza</option><option>Şəxsi</option></select>
   <select id="f_brand"><option value="">Brend</option>${META.brands.map(b=>`<option ${state.brand===b?'selected':''}>${esc(b)}</option>`).join('')}</select>
   <input id="f_pmin" type="number" placeholder="min ₼" style="width:82px" value="${state.pmin}">
@@ -478,13 +478,12 @@ function catAnalysis(cat){
 }
 // Budget browser — each 200₼ range as its own paginated panel. Defaults to «Yeni» condition (used → Vəziyyət filter).
 function budgetView(cat){
- const sig=JSON.stringify([state.cat,state.sub,state.cond,state.seller,state.usage,state.brand,state.pmin,state.pmax,state.onlyNew,state.pram,state.pcpu,state.pcgen,state.pcser,state.pstor,state.pscr,state.pgpu,state.q,state.sortKey,state.sortDir]);
+ const sig=JSON.stringify(['B',state.condMode,state.cat,state.sub,state.seller,state.usage,state.brand,state.pmin,state.pmax,state.onlyNew,state.pram,state.pcpu,state.pcgen,state.pcser,state.pstor,state.pscr,state.pgpu,state.q,state.sortKey,state.sortDir]);
  if(state._bsig!==sig){state.bandPages={};state._bsig=sig;}
- let base=filtered(DATA,!state.sub).filter(r=>r.value_score!=null);
- if(!state.cond)base=base.filter(r=>r.condition==='Yeni'); // default: yalnız «Yeni»; köhnə (İkinci əl) → Vəziyyət filtri
+ let base=applyCondMode(filtered(DATA,!state.sub,true).filter(r=>r.value_score!=null));
  const g={};base.forEach(r=>{const b=band200(r.price);if(!b)return;(g[b]=g[b]||[]).push(r);});
  const bands=Object.keys(g).sort((a,b)=>(a==='2000+'?1e9:parseInt(a))-(b==='2000+'?1e9:parseInt(b)));
- const note=`<div class="panel" style="padding:10px 14px;margin-bottom:12px"><span class="small">💡 Bu görünüş standart olaraq <b>yalnız «Yeni» vəziyyətli</b> məhsulları göstərir — işlənmişlər üçün yuxarıdakı <b>Vəziyyət</b> filtrini «İkinci əl» seç. Hər aralıq ayrıca səhifələnir.</span></div>`;
+ const note=`<div class="panel" style="padding:12px 14px;margin-bottom:12px">${condModeBar()}<span class="small">💡 Yuxarıdan vəziyyət seç: <b>Yalnız Yeni</b>, <b>Yeni + İkinci əl</b> (qarışıq) və ya <b>Yalnız İkinci əl</b>. Hər qiymət aralığı ayrıca səhifələnir.</span></div>`;
  if(!bands.length)return note+'<div class="panel muted">Bu seçim üçün məhsul yoxdur.</div>';
  const maxSpec=Math.max(1,...base.map(r=>r.spec_score||0));
  const PS=15;
@@ -520,13 +519,13 @@ function bindBandPagers(){$('#root').querySelectorAll('.bandpager').forEach(bp=>
 // Parameter browser — CPU / RAM / VGA only. Each value = its own panel with the cheapest top-15 (paginated).
 function paramView(cat){
  const dim=state.paramTab||'ram';
- const sig=JSON.stringify(['P',dim,state.cat,state.sub,state.cond,state.seller,state.usage,state.brand,state.pmin,state.pmax,state.onlyNew,state.pram,state.pcpu,state.pcgen,state.pcser,state.pstor,state.pscr,state.pgpu,state.q]);
+ const sig=JSON.stringify(['P',dim,state.condMode,state.cat,state.sub,state.seller,state.usage,state.brand,state.pmin,state.pmax,state.onlyNew,state.pram,state.pcpu,state.pcgen,state.pcser,state.pstor,state.pscr,state.pgpu,state.q]);
  if(state._bsig!==sig){state.bandPages={};state._bsig=sig;}
  const sel=`<div class="controls" style="margin-bottom:12px"><span class="small" style="align-self:center;font-weight:700">Parametr növü:</span>
    <button class="chip ${dim==='cpu'?'on':''}" data-pt="cpu">⚙️ CPU</button>
    <button class="chip ${dim==='ram'?'on':''}" data-pt="ram">🧠 RAM</button>
    <button class="chip ${dim==='vga'?'on':''}" data-pt="vga">🎮 VGA (Video kart)</button></div>`;
- let base=filtered(DATA,!state.sub).filter(r=>r.value_score!=null);
+ let base=applyCondMode(filtered(DATA,!state.sub,true).filter(r=>r.value_score!=null));
  const field=dim==='cpu'?'cpu_fam':(dim==='ram'?'ram':'gpu');
  const g={};base.forEach(r=>{const v=r[field];if(v==null||v==='')return;(g[v]=g[v]||[]).push(r);});
  let keys=Object.keys(g);
@@ -535,7 +534,7 @@ function paramView(cat){
  if(!keys.length)return sel+'<div class="panel muted">Bu kateqoriyada CPU/RAM/VGA parametri strukturlaşmayıb (əsasən noutbuk/masaüstü üçün mövcuddur).</div>';
  const maxSpec=Math.max(1,...base.map(r=>r.spec_score||0));const PS=15;const icon=dim==='cpu'?'⚙️':(dim==='ram'?'🧠':'🎮');
  const bhead=`<thead><tr><th>Model</th><th>Qiymət</th><th>Güc</th><th>Vəziyyət</th><th>Satıcı</th><th>Telefon</th></tr></thead>`;
- let out=sel+`<div class="panel" style="padding:10px 14px;margin-bottom:12px"><span class="small">💡 Seçilmiş parametrin hər dəyəri ayrıca — ən <b>sərfəli qiymətli məhsullar öndə</b> (ən ucuz → bahalı). Hər qrup müstəqil səhifələnir. Vəziyyət filtri ilə Yeni/İkinci əl daralt.</span></div>`;
+ let out=sel+`<div class="panel" style="padding:12px 14px;margin-bottom:12px">${condModeBar()}<span class="small">💡 Seçilmiş parametrin hər dəyəri ayrıca — ən <b>sərfəli qiymətli məhsullar öndə</b> (ən ucuz → bahalı). Yuxarıdan Yalnız Yeni / qarışıq / Yalnız İkinci əl seç. Hər qrup müstəqil səhifələnir.</span></div>`;
  keys.forEach(v=>{
   const items=g[v].slice().sort((a,b)=>(a.price||1e9)-(b.price||1e9));
   const key='p|'+dim+'|'+v;
@@ -563,6 +562,13 @@ function paramView(cat){
  return out;
 }
 function bindParamSel(){$('#root').querySelectorAll('[data-pt]').forEach(b=>b.onclick=()=>{state.paramTab=b.dataset.pt;render();});}
+// Condition mode toggle for budget/param views: only-new / mixed / only-used
+function condModeBar(){return `<div class="controls" style="margin-bottom:0"><span class="small" style="align-self:center;font-weight:700">Vəziyyət:</span>
+  <button class="chip ${state.condMode==='yeni'?'on':''}" data-cm="yeni">🆕 Yalnız Yeni</button>
+  <button class="chip ${state.condMode==='all'?'on':''}" data-cm="all">🔀 Yeni + İkinci əl</button>
+  <button class="chip ${state.condMode==='used'?'on':''}" data-cm="used">♻️ Yalnız İkinci əl</button></div>`;}
+function applyCondMode(rows){return state.condMode==='yeni'?rows.filter(r=>r.condition==='Yeni'):(state.condMode==='used'?rows.filter(r=>r.condition==='İkinci əl'):rows);}
+function bindCondMode(){$('#root').querySelectorAll('[data-cm]').forEach(b=>b.onclick=()=>{state.condMode=b.dataset.cm;render();});}
 function render1(){
  const root=$('#root');const v=state.view;
  let title='İcmal',sub='';
@@ -611,13 +617,13 @@ function render1(){
    root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}</div>`+catAnalysis(state.cat);
    bindFilters();bindSubtabs();
   } else if(cm&&state.catTab==='budget'){
-   sub=`hər qiymət aralığı ayrıca · yalnız «Yeni»`;
-   root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}</div>`+budgetView(state.cat);
-   bindFilters();bindSubtabs();bindBandPagers();
+   sub=`hər qiymət aralığı ayrıca`;
+   root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true,true)}${tabs}</div>`+budgetView(state.cat);
+   bindFilters();bindSubtabs();bindCondMode();bindBandPagers();
   } else if(cm&&state.catTab==='param'){
    sub=`CPU / RAM / VGA üzrə ən sərfəli qiymət`;
-   root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}</div>`+paramView(state.cat);
-   bindFilters();bindSubtabs();bindParamSel();bindBandPagers();
+   root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true,true)}${tabs}</div>`+paramView(state.cat);
+   bindFilters();bindSubtabs();bindParamSel();bindCondMode();bindBandPagers();
   } else {
    const rows=sortRows(fr);sub=`${rows.length} nəticə`;
    root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}<div class="tblwrap">${tableHTML(rows)}</div>${pager(rows.length)}</div>`;
