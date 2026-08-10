@@ -24,6 +24,8 @@
 
 **Büdcə tabında alt-kateqoriya ayrımı** (`state.budgetSub`/`bindBudgetSub`) — çox-alt-kateqoriyalı kateqoriyalarda (Komponent/Monitor 12 alt-kat, Masaüstü 5) əvvəl bütün alt-katlar qiymət aralığında qarışırdı (monitor+SSD+GPU eyni banda — mənasız). İndi **📂 alt-kateqoriya çip seçici**, default **ən böyük alt-kat** (Monitor), «🔀 Hamısı» ilə qarışıq. Hər alt-kat homogen aralıqlar + öz Güc barı (monitor var, keys yox). `filtersBar(,,hideSub)` bu görünüşdə sub dropdown gizli. Tək-alt-kateqoriyalı (noutbuk) → seçici yoxdur.
 
+**Komponent Cədvəl tabı yenidən quruldu** (`componentTable`/`bindBrandBreak`) — çox-alt-kateqoriyalı kateqoriyalarda Cədvəl: (1) 📂 alt-kateqoriya çip seçici (budgetSub, default Monitor), (2) 🏷 **brend üzrə təsnifat** çipləri (say ilə, kliklə filtr — seçilmiş alt-kat üzrə, top 16), (3) həmin alt-katın qiymət+parametr cədvəli. `filtered()` **skipBrand** param (breakdown brend filtrindən asılı deyil). Sub dropdown gizli, Brend dropdown qalır (bütün brendlər). Tək-alt-kateqoriyalı (noutbuk) → köhnə düz cədvəl. **Beləliklə həm Cədvəl, həm Büdcə komponentlərdə alt-kateqoriya-birinci.**
+
 **Monitorlar Gaming/Ofis-ə ayrıldı** (`_monitor_usage` build_html-də, report layer): təzələnmə **≥100Hz və ya gaming açar söz** → Gaming; **≤75Hz/məlumatsız** → Ofis. 2386 monitor → 1282 Gaming / 1104 Ofis. usage='Komponent' → Gaming/Ofis-ə override (mövcud DB ilə dərhal işləyir; hər report-da yenidən hesablanır, DB-dəki köhnə dəyəri korrektləyir). Nəticə: İstifadə filtri + Gaming/Ofis KPI monitorları əhatə edir. Büdcə/Parametr sətirlərində `usageTag` (🎮/💼). ⚠️ Excel-də (report_excel) hələ 'Komponent' — yalnız HTML dashboard-da düzəldilib.
 
 ---
