@@ -480,7 +480,9 @@ function catAnalysis(cat){
 function budgetView(cat){
  const sig=JSON.stringify(['B',state.condMode,state.cat,state.sub,state.seller,state.usage,state.brand,state.pmin,state.pmax,state.onlyNew,state.pram,state.pcpu,state.pcgen,state.pcser,state.pstor,state.pscr,state.pgpu,state.q,state.sortKey,state.sortDir]);
  if(state._bsig!==sig){state.bandPages={};state._bsig=sig;}
- let base=applyCondMode(filtered(DATA,!state.sub,true).filter(r=>r.value_score!=null));
+ let base=applyCondMode(filtered(DATA,!state.sub,true).filter(r=>+r.price>=1)); // <1₼ = metrlə kabel və s. küy
+ const scoredCat=base.some(r=>r.value_score!=null); // laptop/desktop/spec'd komponent → keyfiyyət filtri; aksesuar/ofis → hamısı
+ if(scoredCat)base=base.filter(r=>r.value_score!=null);
  const g={};base.forEach(r=>{const b=band200(r.price);if(!b)return;(g[b]=g[b]||[]).push(r);});
  const bands=Object.keys(g).sort((a,b)=>(a==='2000+'?1e9:parseInt(a))-(b==='2000+'?1e9:parseInt(b)));
  const note=`<div class="panel" style="padding:12px 14px;margin-bottom:12px">${condModeBar()}<span class="small">💡 Yuxarıdan vəziyyət seç: <b>Yalnız Yeni</b>, <b>Yeni + İkinci əl</b> (qarışıq) və ya <b>Yalnız İkinci əl</b>. Hər qiymət aralığı ayrıca səhifələnir.</span></div>`;
@@ -490,16 +492,16 @@ function budgetView(cat){
  const bhead=`<thead><tr><th>Model</th><th>Qiymət</th><th>Güc</th><th>Vəziyyət</th><th>Satıcı</th><th>Telefon</th></tr></thead>`;
  let out=note;
  bands.forEach(b=>{
-  const items=sortRows(g[b]);
+  const items=scoredCat?sortRows(g[b]):g[b].slice().sort((x,y)=>(x.price||1e9)-(y.price||1e9));
   const pages=Math.max(1,Math.ceil(items.length/PS));
   let pg=state.bandPages[b]||0;if(pg>=pages)pg=pages-1;if(pg<0)pg=0;
   const slice=items.slice(pg*PS,pg*PS+PS);
   const wp=items.filter(r=>r.price);const avg=wp.length?wp.reduce((a,c)=>a+c.price,0)/wp.length:0;
-  const rows=slice.map(r=>{const sp=r.spec_score||0,pct=Math.max(4,Math.round(sp/maxSpec*100));
+  const rows=slice.map(r=>{const guc=(scoredCat&&r.spec_score)?`<div class="pwwrap"><div class="pw"><i style="width:${Math.max(4,Math.round(r.spec_score/maxSpec*100))}%"></i></div><span class="pwn">${Math.round(r.spec_score/maxSpec*100)}</span></div>`:'<span class="small">—</span>';
    return `<tr>
     <td><a href="${esc(r.link)}" target="_blank">${esc((r.name||'').slice(0,52))}</a>${r.new?' <span class="tg new">🆕</span>':''}${specChips(r)}</td>
     <td class="num"><b>${fmt(r.price)} ₼</b></td>
-    <td><div class="pwwrap"><div class="pw"><i style="width:${pct}%"></i></div><span class="pwn">${pct}</span></div></td>
+    <td>${guc}</td>
     <td class="small">${esc(r.condition||'')}</td>
     <td class="${r.seller_type==='Mağaza'?'shop':'priv'}">${esc(r.seller_type||'')}</td>
     <td class="small">${esc(r.phones||'')}</td></tr>`;}).join('');
@@ -531,7 +533,7 @@ function paramView(cat){
  let keys=Object.keys(g);
  if(dim==='ram')keys.sort((a,b)=>(+b)-(+a));
  else {keys=keys.filter(k=>g[k].length>=2).sort((a,b)=>g[b].length-g[a].length);if(dim==='vga')keys=keys.slice(0,40);}
- if(!keys.length)return sel+'<div class="panel muted">Bu kateqoriyada CPU/RAM/VGA parametri strukturlaşmayıb (əsasən noutbuk/masaüstü üçün mövcuddur).</div>';
+ if(!keys.length)return sel+'<div class="panel muted">CPU/RAM/VGA struktur parametrləri yalnız <b>noutbuk və masaüstü</b> üçün mövcuddur. Komponentlərdə (monitor, SSD, video kart və s.) parametrə görə ən ucuz məhsullar üçün <b>«📊 Alt-kateqoriya analizi»</b> tabından istifadə et.</div>';
  const maxSpec=Math.max(1,...base.map(r=>r.spec_score||0));const PS=15;const icon=dim==='cpu'?'⚙️':(dim==='ram'?'🧠':'🎮');
  const bhead=`<thead><tr><th>Model</th><th>Qiymət</th><th>Güc</th><th>Vəziyyət</th><th>Satıcı</th><th>Telefon</th></tr></thead>`;
  let out=sel+`<div class="panel" style="padding:12px 14px;margin-bottom:12px">${condModeBar()}<span class="small">💡 Seçilmiş parametrin hər dəyəri ayrıca — ən <b>sərfəli qiymətli məhsullar öndə</b> (ən ucuz → bahalı). Yuxarıdan Yalnız Yeni / qarışıq / Yalnız İkinci əl seç. Hər qrup müstəqil səhifələnir.</span></div>`;
