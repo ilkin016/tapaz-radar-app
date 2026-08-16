@@ -107,6 +107,11 @@ class Store:
         r = self.db.execute("SELECT run_ts FROM runs ORDER BY run_ts DESC LIMIT 1").fetchone()
         return r["run_ts"] if r else None
 
+    def cat_last_runs(self):
+        """Hər kateqoriya üzrə sonuncu UĞURLU crawl vaxtı (runs cədvəli — yalnız uğurlu run-da yazılır)."""
+        return {r["category"]: r["ts"] for r in self.db.execute(
+            "SELECT category, MAX(run_ts) ts FROM runs GROUP BY category").fetchall()}
+
     def stats(self):
         c = self.db.execute("SELECT COUNT(*) n FROM listings WHERE active=1").fetchone()["n"]
         runs = self.db.execute("SELECT COUNT(*) n FROM runs").fetchone()["n"]

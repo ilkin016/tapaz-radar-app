@@ -86,7 +86,7 @@ def run(cap=None, workers=6, only=None):
     print(f"\nHesabat: {len(listings)} aktiv elan, {len(new_now)} bu run-da yeni.")
     html_path = os.path.join(OUT, "dashboard.html")
     xlsx_path = os.path.join(OUT, "tapaz_radar.xlsx")
-    build_html(listings, new_now, run_ts, html_path)
+    build_html(listings, new_now, run_ts, html_path, cat_last=store.cat_last_runs())
     build_excel(listings, {r["ad_id"] for r in new_now}, run_ts, xlsx_path)
     print(f"✓ {html_path}\n✓ {xlsx_path}")
     print("Stats:", store.stats())
@@ -98,7 +98,7 @@ def report_only():
     listings = store.listings(active_only=True)
     new_now = store.new_in_run(run_ts)
     os.makedirs(OUT, exist_ok=True)
-    build_html(listings, new_now, run_ts, os.path.join(OUT, "dashboard.html"))
+    build_html(listings, new_now, run_ts, os.path.join(OUT, "dashboard.html"), cat_last=store.cat_last_runs())
     build_excel(listings, {r["ad_id"] for r in new_now}, run_ts, os.path.join(OUT, "tapaz_radar.xlsx"))
     print("Reports regenerated from DB.")
 

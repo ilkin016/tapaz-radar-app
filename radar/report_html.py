@@ -27,8 +27,11 @@ CAT_LABELS = {
 }
 
 
-def build_html(listings, new_now, run_ts, path, public=False):
-    """public=True → seller phone numbers omitted (privacy for online/GitHub Pages deploy)."""
+def build_html(listings, new_now, run_ts, path, public=False, cat_last=None):
+    """public=True → seller phone numbers omitted (privacy for online/GitHub Pages deploy).
+    cat_last: {category: son_uğurlu_run_ts} — hər kateqoriya üzrə freshness göstərmək üçün."""
+    from radar import comp_specs
+    cat_last = cat_last or {}
     new_ids = {r["ad_id"] for r in new_now}
     keys = ("id", "name", "brand", "price", "band", "spec_score", "value_score", "cpu", "cpu_fam",
             "ram", "storage", "screen", "gpu", "os", "usage", "condition", "category", "subcategory",
@@ -36,14 +39,20 @@ def build_html(listings, new_now, run_ts, path, public=False):
     data = []
     for r in listings:
         d = {k: r.get(k) for k in keys}
-        if r.get("category") == "komputer-avadanliqi" and r.get("subcategory") == "Monitor":
-            d["usage"] = _monitor_usage(r.get("name"), r.get("params"))  # monitorları Gaming/Ofis-ə ayır
+        if r.get("category") == "komputer-avadanliqi":
+            if r.get("subcategory") == "Monitor":
+                d["usage"] = _monitor_usage(r.get("name"), r.get("params"))  # monitorları Gaming/Ofis-ə ayır
+            cs = comp_specs.component_specs(r.get("subcategory"), r.get("name"), r.get("params"))
+            if cs:
+                d.update(cs)  # kateqoriya-spesifik filtr sahələri (cpu/ram/gpu/ssd/mobo/monitor)
         if public:
             d["phones"] = ""  # do not expose seller phone numbers on a public URL
         d["new"] = 1 if r["ad_id"] in new_ids else 0
         data.append(d)
     cats = [c for c in Counter(r.get("category") for r in listings).keys() if c]
-    cat_meta = [{"slug": c, "label": CAT_LABELS.get(c, c), "n": sum(1 for r in listings if r.get("category") == c)} for c in cats]
+    cat_meta = [{"slug": c, "label": CAT_LABELS.get(c, c),
+                 "n": sum(1 for r in listings if r.get("category") == c),
+                 "last": (cat_last.get(c) or "")[:10]} for c in cats]
     meta = {
         "cats": cat_meta,
         "subs": {c: sorted({r.get("subcategory") for r in listings if r.get("category") == c and r.get("subcategory")}) for c in cats},
@@ -190,10 +199,13 @@ const esc=s=>(s==null?'':(''+s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 const store={get(){try{return new Set(JSON.parse(localStorage.getItem('radar_star')||'[]'))}catch(e){return new Set()}},
  set(s){localStorage.setItem('radar_star',JSON.stringify([...s]))}};
 let STAR=store.get();
-$('#brsub').textContent=`${META.n_total} elan · ${META.n_new} 🆕 · ${META.run_ts.slice(0,10)}`;
+function daysAgo(d){if(!d)return null;const t=new Date(d+'T00:00:00'),n=new Date();return Math.floor((n-t)/86400000);}
+function staleBadge(d){const a=daysAgo(d);if(a==null)return '';return a>2?` <span style="color:var(--bad);font-weight:700">⚠️ ${a} gün köhnə</span>`:(a<=0?` <span style="color:var(--good);font-weight:700">✓ bu gün</span>`:` <span class="muted">${a} gün əvvəl</span>`);}
+{const dts=META.cats.map(c=>c.last).filter(Boolean).sort();const oldest=dts[0]||META.run_ts.slice(0,10),newest=dts[dts.length-1]||oldest;
+ $('#brsub').innerHTML=`${fmt(META.n_total)} elan · ${META.n_new} 🆕 · son skan ${newest}`+(oldest!==newest?` <span style="color:var(--bad)">(ən köhnə ${oldest})</span>`:'');}
 
 const state={view:'overview',cat:'',sub:'',cond:'',seller:'',usage:'',brand:'',pmin:'',pmax:'',onlyNew:false,q:'',
- pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1,page:0,ps:50,catTab:'table',bandPages:{},paramTab:'ram',condMode:'yeni',budgetSub:''};
+ pram:'',pcpu:'',pcgen:'',pcser:'',pstor:'',pscr:'',pgpu:'',sortKey:'value_score',sortDir:-1,page:0,ps:50,catTab:'table',bandPages:{},paramTab:'ram',condMode:'yeni',budgetSub:'',cf:{}};
 function distinct(field,cat){const s=new Set();DATA.forEach(r=>{if(cat&&r.category!==cat)return;const v=r[field];if(v!=null&&v!=='')s.add(v);});return [...s];}
 
 // ---------- navigation ----------
@@ -602,8 +614,35 @@ function condModeBar(){return `<div class="controls" style="margin-bottom:0"><sp
   <button class="chip ${state.condMode==='used'?'on':''}" data-cm="used">♻️ Yalnız İkinci əl</button></div>`;}
 function applyCondMode(rows){return state.condMode==='yeni'?rows.filter(r=>r.condition==='Yeni'):(state.condMode==='used'?rows.filter(r=>r.condition==='İkinci əl'):rows);}
 function bindCondMode(){$('#root').querySelectorAll('[data-cm]').forEach(b=>b.onclick=()=>{state.condMode=b.dataset.cm;render();});}
-function bindBudgetSub(){$('#root').querySelectorAll('[data-bs]').forEach(b=>b.onclick=()=>{state.budgetSub=b.dataset.bs;state.bandPages={};state.brand='';state.page=0;render();});}
-// Component table view: sub-category chips → brand breakdown → paginated table (price + parameters)
+function bindBudgetSub(){$('#root').querySelectorAll('[data-bs]').forEach(b=>b.onclick=()=>{state.budgetSub=b.dataset.bs;state.bandPages={};state.brand='';state.cf={};state.page=0;render();});}
+// Kateqoriya-spesifik kaskad filtrlər (komponentlər üçün) — comp_specs.py sahələri üzərində
+const COMP_FACETS={
+ 'CPU':[{f:'c_brand',l:'Brend'},{f:'c_series',l:'Seriya'},{f:'c_model',l:'Model',lim:24}],
+ 'Ana plata':[{f:'mb_plat',l:'Platforma'}],
+ 'RAM':[{f:'ram_type',l:'Tip'},{f:'ram_bucket',l:'Tutum'}],
+ 'Video kart (GPU)':[{f:'gpu_series',l:'Seriya'},{f:'gpu_model',l:'Model',lim:24}],
+ 'Sərt disk (SSD/HDD)':[{f:'ssd_iface',l:'Növ'},{f:'ssd_bucket',l:'Həcm'}],
+ 'Monitor':[{f:'usage',l:'Model'},{f:'mon_oled',l:'Panel',bool:true},{f:'mon_size_b',l:'Ölçü'},{f:'mon_res',l:'Keyfiyyət'},{f:'mon_hz_b',l:'Tezlik'}]
+};
+function compFacets(bsub, rows0){
+ const defs=COMP_FACETS[bsub]||[];if(!defs.length)return {html:'',rows:rows0};
+ let s=rows0, html='';
+ defs.forEach(d=>{
+  const cnt={};
+  s.forEach(r=>{let v=r[d.f];if(d.bool){if(!v)return;v='1';}else{if(v==null||v==='')return;v=''+v;}cnt[v]=(cnt[v]||0)+1;});
+  let vals=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);if(d.lim)vals=vals.slice(0,d.lim);
+  if(!vals.length)return;
+  const sel=state.cf[d.f]||'';
+  const chip=(val,lab,c,on)=>`<button class="chip ${on?'on':''}" data-cf="${d.f}" data-cfv="${esc(val)}">${esc(lab)}${c!=null?` <span class="small">${c}</span>`:''}</button>`;
+  html+=`<div class="controls" style="margin:0 0 5px"><span class="small" style="align-self:center;font-weight:700;min-width:78px">${d.l}:</span>`
+   +(d.bool?'':chip('','Hamısı',null,!sel))
+   +vals.map(v=>chip(v, d.bool?'✓ OLED':v, cnt[v], sel===v)).join('')+`</div>`;
+  if(sel)s=s.filter(r=>{let v=r[d.f];if(d.bool)return !!v;if(v==null||v==='')return false;return (''+v)===sel;});
+ });
+ return {html:html?`<div class="panel" style="padding:11px 14px 6px;margin-bottom:12px"><div class="small" style="font-weight:800;margin-bottom:7px">⚙️ ${esc(bsub)} filtrləri</div>${html}</div>`:'', rows:s};
+}
+function bindCompFacets(){$('#root').querySelectorAll('[data-cf]').forEach(b=>b.onclick=()=>{const f=b.dataset.cf,v=b.dataset.cfv;state.cf[f]=(state.cf[f]===v)?'':v;state.page=0;render();});}
+// Component table view: sub-category chips → brand breakdown → kaskad filtrlər → paginated table
 function componentTable(cat){
  let base=filtered(DATA,true,false,true); // alt-kat + brend burada; cond/usage/seller/qiymət/param saxlanır
  const cnt={};base.forEach(r=>{const s=r.subcategory||'Digər';cnt[s]=(cnt[s]||0)+1;});
@@ -618,10 +657,12 @@ function componentTable(cat){
  const brandChips=`<div class="panel" style="padding:11px 14px;margin-bottom:12px"><div class="controls" style="margin:0"><span class="small" style="align-self:center;font-weight:700">🏷 Brend üzrə:</span>`
   +`<button class="chip ${!state.brand?'on':''}" data-brk="">Hamısı ${scoped.length}</button>`
   +bord.map(b=>`<button class="chip ${state.brand===b?'on':''}" data-brk="${esc(b)}">${esc(b)} <span class="small">${bcnt[b]}</span></button>`).join('')+`</div></div>`;
- let rows=sortRows(state.brand?scoped.filter(r=>r.brand===state.brand):scoped);
- return subChips+brandChips+`<div class="panel"><div class="tblwrap">${tableHTML(rows)}</div>${pager(rows.length)}</div>`;
+ const afterBrand=state.brand?scoped.filter(r=>r.brand===state.brand):scoped;
+ const fac=compFacets(bsub, afterBrand);
+ let rows=sortRows(fac.rows);
+ return subChips+brandChips+fac.html+`<div class="panel"><div class="tblwrap">${tableHTML(rows)}</div>${pager(rows.length)}</div>`;
 }
-function bindBrandBreak(){$('#root').querySelectorAll('[data-brk]').forEach(b=>b.onclick=()=>{state.brand=b.dataset.brk;state.page=0;render();});}
+function bindBrandBreak(){$('#root').querySelectorAll('[data-brk]').forEach(b=>b.onclick=()=>{state.brand=b.dataset.brk;state.cf={};state.page=0;render();});}
 function render1(){
  const root=$('#root');const v=state.view;
  let title='İcmal',sub='';
@@ -632,7 +673,7 @@ function render1(){
   const usageC={'Gaming':scored.filter(r=>r.usage==='Gaming').length,'Ofis / Gündəlik':scored.filter(r=>r.usage==='Ofis / Gündəlik').length};
   const condC=countBy(scored,'condition');
   root.innerHTML=kpiStrip(DATA)+
-   `<div class="panel"><h2>Kateqoriyalar <span class="small">— klikləyib bax · hər kateqoriyada «📊 Alt-kateqoriya analizi» tabı</span></h2><div class="catcards">${META.cats.map(c=>`<div class="catcard" onclick="go('cat:${c.slug}')"><div>${c.label}</div><div class="b">${c.n}</div><div class="muted">bax →</div></div>`).join('')}</div></div>`+
+   `<div class="panel"><h2>Kateqoriyalar <span class="small">— klikləyib bax · 🕒 son yenilənmə tarixi</span></h2><div class="catcards">${META.cats.map(c=>`<div class="catcard" onclick="go('cat:${c.slug}')"><div>${c.label}</div><div class="b">${fmt(c.n)}</div><div class="muted" style="font-size:11px">🕒 ${c.last||'—'}${staleBadge(c.last)}</div></div>`).join('')}</div></div>`+
    `<div class="grid2">
      <div class="panel"><h2>💰 Qiymət aralığı <span class="small">(200 ₼ · klik→filtr)</span></h2>${cbars(bd.c,bd.ord,k=>k+' ₼','band')}</div>
      <div class="panel"><h2>🏷 Brend <span class="small">(klik→filtr)</span></h2>${cbars(countBy(scored,'brand'),null,x=>x,'brand',10)}</div></div>`+
@@ -680,9 +721,9 @@ function render1(){
   } else {
    const subsAll=META.subs[state.cat]||[];
    if(cm&&subsAll.length>1){ // komponent kimi çox-alt-kateqoriyalı: alt-kat seçimi + brend təsnifatı + cədvəl
-    sub=`alt-kateqoriya + brend üzrə`;
+    sub=`alt-kateqoriya + brend + parametr filtrləri`;
     root.innerHTML=kpiStrip(filtered(DATA,true,false,true))+`<div class="panel">${filtersBar(true,false,true)}${tabs}</div>`+componentTable(state.cat);
-    bindFilters();bindSubtabs();bindBudgetSub();bindBrandBreak();bindTable();bindPager();
+    bindFilters();bindSubtabs();bindBudgetSub();bindBrandBreak();bindCompFacets();bindTable();bindPager();
    } else {
     const rows=sortRows(fr);sub=`${rows.length} nəticə`;
     root.innerHTML=kpiStrip(fr)+`<div class="panel">${filtersBar(true)}${tabs}<div class="tblwrap">${tableHTML(rows)}</div>${pager(rows.length)}</div>`;
