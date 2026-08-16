@@ -96,6 +96,16 @@ Vizual + JS təsdiq: bütün bölmələr render olunur, 35 kliklənən bar, JS x
 - **Task 3 (tap.az posting modulu) — YALNIZ ANALİZ (icra istifadəçi təsdiqini gözləyir):** tam texniki analiz `docs/POSTING-MODULE-analiz.md`. Auth: `api.digit-u.id` (OTP) → GraphQL `loginUser(accessToken)`; elan: `createAd(adParams: CreateAdAttributes!)`; şəkil: `POST photos.tap.az/pond`. Arxitektura: **Mac-local backend** (Cloudflare residential IP). **🔴 Əsas risk: dublikat qaydası** — eyni elanı 30 gün içində yeni `createAd` kimi post = hesab bloku; `prolongAd` alternativi var. **Açıq suallar (icradan əvvəl):** prolongAd vs createAd niyyəti, csrfToken header, /pond auth, CAPTCHA, collection value semantikası, session ömrü.
 - **🔴 Auto-refresh-on-entry (Task 1c) — QƏRAR GÖZLƏNİR:** statik dashboard özü scrape edə bilmir (Cloudflare VPS-i bloklayır). Yalnız **Mac-local backend** ilə mümkündür (Task 3 ilə eyni infrastruktur). Variant: (i) Mac-local Flask servis — dashboard localhost-da açılanda /api/refresh çağırır, SSE ilə "bitdi" bildirişi; (ii) cari statik + timestamp (indi əlavə olundu). Task 3 ilə birlikdə qərar veriləcək.
 
+## 🚀 2026-08-16 (gec) — Task 3 posting sistemi QURULDU + self-test 8/8
+
+**Modullar:** `poster.py` (AdReader+PhotoReuploader `/pond`+PropertyMapper+createAd+check_status+repost), `tapaz_auth.py` (OTP→loginUser, sessiya macOS Keychain), `backend.py` (Mac-local http.server: /api/status,/refresh,/auth/*,/repost,/repost-status; login bir prosesdə; skan-guard), `report_html.py` (🛠 admin UI + **auto-refresh on entry** = Task 1c; backend yoxdursa gizli), `run_backend.sh` (backend + reverse-SSH tunel = Mac & VPS).
+
+**M0 canlı brauzer testi ilə TƏSDİQLƏNDİ:** `/pond`→200 (sessiya-cookie), `createAd` işləyir (elan 48443132 yarandı→REJECTED, qısa təsvir), status sorğusu **`ad(legacyId:nömrə)`** (id/gid YOX — client bug düzəldildi). Moderasiya axını: createAd→**dərhal canlı olmur**→moderasiya→APPROVED/REJECTED. İstifadəçi modeli: DRAFT→operator/status yoxlaması.
+
+**Self-test 8/8:** sintaksis · /api/status · dashboard · repost dry_run (9-sahə payload) · auth guard · createAd schema · comp_specs · AuthClient. Payload düzgün map olunur (Marka 822→optionId, Yeni? 769, Çatdırılma? 858).
+
+**⚠️ QALAN — yalnız istifadəçi edə bilər (təhlükəsizlik):** canlı OTP login. UI formada nömrə→SMS→kod→sessiya (Keychain). Sonra tam E2E canlı. digit-u /auth sahə adları login-də dəqiqləşir (client çox-variant sınayır). Başlat: `./run_backend.sh` → http://127.0.0.1:8091/ → 🛠 Repost/Yenilə.
+
 ## ⚠️ Yarımçıq / açıq suallar
 
 - **Növbədəki tapşırıq:** istifadəçi "növbəti task"-ı sonra bildirəcək (bu session-da tapşırıq verilmədi).
