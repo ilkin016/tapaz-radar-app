@@ -211,10 +211,12 @@ function distinct(field,cat){const s=new Set();DATA.forEach(r=>{if(cat&&r.catego
 // ---------- navigation ----------
 const NAV=[['overview','📊 İcmal'],['best','⭐ Ən uyğun'],['new','🆕 Yeni'],['SEP','Kateqoriyalar'],
  ...META.cats.map(c=>['cat:'+c.slug,c.label,c.n]),['SEP','Alətlər'],
- ['analysis','📈 Parametr analizi'],['stars','⭐ Seçilmişlər']];
+ ['analysis','📈 Parametr analizi'],['stars','⭐ Seçilmişlər'],['SEP','İdarəetmə (backend)'],
+ ['admin','🛠 Repost / Yenilə']];
 function buildNav(){
  const n=$('#nav');n.innerHTML='';
  NAV.forEach(item=>{
+  if(!BACKEND && (item[0]==='admin' || item[1]==='İdarəetmə (backend)'))return; // backend yoxdursa gizlət
   if(item[0]==='SEP'){const d=document.createElement('div');d.className='sep';d.textContent=item[1];n.appendChild(d);return;}
   const b=document.createElement('button');b.dataset.k=item[0];
   b.innerHTML=`<span>${item[1]}</span>`+(item[2]!=null?`<span class="cnt">${item[2]}</span>`:'');
@@ -742,6 +744,9 @@ function render1(){
   title='⭐ Seçilmişlər';const rows=sortRows(DATA.filter(r=>STAR.has(r.id)));sub=`${rows.length} qeyd olunmuş`;
   root.innerHTML=rows.length?`<div class="panel"><div class="tblwrap">${tableHTML(rows)}</div>${pager(rows.length)}</div>`:'<div class="panel muted">Hələ heç nə seçməmisən. Cədvəldə ★ ulduza kliklə.</div>';
   bindTable();if(rows.length)bindPager();
+ } else if(v==='admin'){
+  title='🛠 Repost / Yenilə';sub='backend (Mac-local) tələb olunur';
+  root.innerHTML=adminView();bindAdmin();
  }
  $('#vtitle').textContent=title;$('#vsub').textContent=sub;
 }
@@ -753,6 +758,46 @@ function analysisPanel(title,key,rows,fmtk=x=>x,cmp){
   return `<tr><td><b>${esc(fmtk(k))}</b></td><td class="num">${g.length}</td><td>${cell(lo)}</td><td>${cell(mid)}</td><td>${cell(hi)}</td></tr>`;}).join('');
  return `<div class="panel"><h2>${title} üzrə</h2><table><thead><tr><th>Dəyər</th><th>Say</th><th>Ən ucuz</th><th>Orta</th><th>Ən bahalı</th></tr></thead><tbody>${body}</tbody></table></div>`;
 }
-buildNav();go('overview');
+// ---------- Backend (Mac-local): auto-refresh + posting ----------
+let BACKEND=null;
+async function api(path,opts){try{const r=await fetch(path,opts);return await r.json();}catch(e){return {error:''+e};}}
+async function checkBackend(){const s=await api('/api/status');BACKEND=(s&&s.ok)?s:false;return BACKEND;}
+function adminView(){
+ if(!BACKEND)return `<div class="panel muted" style="line-height:1.7">⚠️ Bu funksiya yalnız <b>Mac-local backend</b> ilə işləyir (Cloudflare VPS-i tap.az-a buraxmır).<br>Terminalda: <code>cd ~/tapaz-radar &amp;&amp; python3 -m radar.backend</code><br>sonra dashboard-u <b>http://127.0.0.1:8091/</b> ünvanından aç.</div>`;
+ const li=BACKEND.logged_in;
+ const login=li
+  ?`<div class="panel"><h2>🔓 tap.az girişi edilib</h2><div class="controls"><span class="small">İstifadəçi: <b>${esc(BACKEND.user||'—')}</b></span><button class="chip" id="a_logout">Çıxış</button></div></div>`
+  :`<div class="panel"><h2>🔑 tap.az girişi (OTP)</h2>
+     <div class="controls"><input id="a_phone" placeholder="0XX XXX XX XX" style="width:180px"><button class="chip on" id="a_send">📩 Kod göndər</button></div>
+     <div class="controls" id="a_coderow" style="display:none"><input id="a_code" placeholder="SMS kodu" style="width:140px"><button class="chip on" id="a_verify">✓ Təsdiqlə</button></div>
+     <div class="small" id="a_authmsg" style="margin-top:4px"></div>
+     <div class="small muted">Kod SƏNİN telefonuna gəlir və SƏN daxil edirsən (təhlükəsizlik — mən OTP-yə toxunmuram).</div></div>`;
+ const repost=`<div class="panel"><h2>📤 Köhnə elanı DRAFT kimi yenidən yerləşdir</h2>
+   <div class="controls"><input id="a_lid" placeholder="Elan nömrəsi (məs 48251733)" style="width:230px">
+    <button class="chip" id="a_preview">👁 Önizləmə</button>
+    <button class="chip on" id="a_post" ${li?'':'disabled title="əvvəl login"'}>📤 Draft yarat</button></div>
+   <div class="small muted">Draft moderasiyaya düşür (dərhal canlı olmur); modul təsdiq statusunu izləyir → operator yayımlayır.</div>
+   <div id="a_result" style="margin-top:10px"></div></div>`;
+ return login+repost;
+}
+function bindAdmin(){const g=id=>document.getElementById(id);const J={'Content-Type':'application/json'};
+ if(g('a_send'))g('a_send').onclick=async()=>{const p=g('a_phone').value.trim();if(!p)return;g('a_authmsg').textContent='Göndərilir…';const r=await api('/api/auth/send-code',{method:'POST',headers:J,body:JSON.stringify({phone:p})});g('a_coderow').style.display='flex';g('a_authmsg').innerHTML=r.ok?'✅ Kod göndərildi — telefonuna bax':('⚠️ '+esc(JSON.stringify(r).slice(0,220)));};
+ if(g('a_verify'))g('a_verify').onclick=async()=>{g('a_authmsg').textContent='Yoxlanılır…';const r=await api('/api/auth/verify',{method:'POST',headers:J,body:JSON.stringify({phone:g('a_phone').value.trim(),code:g('a_code').value.trim()})});if(r.ok&&r.login&&r.login.ok){await checkBackend();render();}else g('a_authmsg').innerHTML='⚠️ '+esc(JSON.stringify(r).slice(0,220));};
+ if(g('a_logout'))g('a_logout').onclick=async()=>{await api('/api/auth/logout',{method:'POST'});await checkBackend();render();};
+ if(g('a_preview'))g('a_preview').onclick=async()=>{const id=g('a_lid').value.trim();if(!id)return;g('a_result').innerHTML='Oxunur…';const r=await api('/api/repost',{method:'POST',headers:J,body:JSON.stringify({listing_id:id,dry_run:true,contact:{}})});if(r.stage==='dry_run'){const a=r.ad;g('a_result').innerHTML=`<div class="panel" style="margin:0"><b>${esc(a.title||'')}</b><div class="small">Kateqoriya: ${esc(a.category_slug)} · Qiymət: ${a.price}₼ · Şəkil: ${a.n_photos} · Atributlar: ${a.properties.collection.length+a.properties.boolean.length}</div></div>`;}else g('a_result').innerHTML='<div class="small">⚠️ '+esc(JSON.stringify(r).slice(0,300))+'</div>';};
+ if(g('a_post'))g('a_post').onclick=async()=>{const id=g('a_lid').value.trim();if(!id)return;if(!confirm('Bu elanı DRAFT kimi öz hesabına yerləşdirim? (moderasiyaya düşəcək)'))return;g('a_result').innerHTML='Yerləşdirilir (şəkillər yüklənir)…';const r=await api('/api/repost',{method:'POST',headers:J,body:JSON.stringify({listing_id:id,contact:{}})});g('a_result').innerHTML=r.stage==='done'?`<div class="panel" style="margin:0"><b>✅ Draft yaradıldı (moderasiyada)</b><div class="small">Status: ${esc((r.status||{}).label||'')} · Yeni elan #${esc((r.created||{}).legacyId||'')}</div></div>`:`<div class="small">⚠️ ${esc(JSON.stringify(r).slice(0,320))}</div>`;};
+}
+// Auto-refresh on entry (stale olduqda)
+function banner(html){let b=document.getElementById('refbanner');if(!b){b=document.createElement('div');b.id='refbanner';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99;background:var(--acc2);color:#fff;padding:8px 16px;font-size:13px;text-align:center;box-shadow:var(--shadow)';document.body.appendChild(b);}b.innerHTML=html;b.style.display=html?'block':'none';}
+async function pollRefresh(){const r=await api('/api/refresh-status');if(r.running){banner('🔄 tap.az məlumatları yenilənir… (bu, bir neçə dəqiqə çəkə bilər)');setTimeout(pollRefresh,4000);}else{banner('✅ Yeniləndi! Ən son məlumatları görmək üçün <b>səhifəni yenilə</b> → <button onclick="location.reload()" style="background:#fff;color:var(--acc2);border:none;border-radius:6px;padding:3px 10px;font-weight:700;cursor:pointer">Yenilə</button> <span onclick="banner(\'\')" style="cursor:pointer;margin-left:10px">✕</span>');}}
+async function maybeAutoRefresh(){
+ if(!BACKEND)return;
+ const dts=META.cats.map(c=>c.last).filter(Boolean).sort();const oldest=dts[0]||'';
+ const stale = !oldest || daysAgo(oldest)>0;   // bugün deyilsə → köhnə
+ if(stale && !BACKEND.refresh.running){banner('🔄 Sistemə giriş — tap.az məlumatları avtomatik yenilənir…');await api('/api/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});setTimeout(pollRefresh,3000);}
+ else if(BACKEND.refresh.running){setTimeout(pollRefresh,2000);}
+}
+async function initBackend(){await checkBackend();buildNav();maybeAutoRefresh();}
+buildNav();go('overview');initBackend();
 document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement!==$('#q')){e.preventDefault();$('#q').focus();}});
 </script></body></html>"""
