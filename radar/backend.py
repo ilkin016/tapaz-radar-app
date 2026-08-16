@@ -87,7 +87,7 @@ class H(BaseHTTPRequestHandler):
         if path == "/api/repost-status":
             if not _AUTH.user:
                 return self._send(401, {"error": "login lazımdır"})
-            return self._send(200, poster.check_status(_AUTH, q.get("ad_gid")))
+            return self._send(200, poster.check_status(_AUTH, q.get("legacy_id") or q.get("ad_gid")))
         return self._send(404, {"error": "yol yoxdur"})
 
     def do_POST(self):

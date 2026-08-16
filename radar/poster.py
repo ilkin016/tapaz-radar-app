@@ -172,19 +172,20 @@ def create_draft(auth, ad_params):
 
 
 # ---------------- 5) Status yoxlaması ----------------
-_AD_STATUS_Q = "query($id:ID!){ ad(id:$id){ id status isExpiredManually rejectReason } }"
+# ‼️ M0 canlı testdə təsdiqləndi: `ad` sorğusu `legacyId` (nömrə) qəbul edir, `id`(gid) YOX.
+_AD_STATUS_Q = "query($lid:ID!){ ad(legacyId:$lid){ id status isExpiredManually rejectReason } }"
 
 
-def check_status(auth, ad_gid):
-    """Yaradılmış elanın moderasiya statusu: yoxlanılır / təsdiqləndi / rədd."""
-    st, js = auth._req(GRAPHQL, {"query": _AD_STATUS_Q, "variables": {"id": ad_gid}},
+def check_status(auth, legacy_id):
+    """Yaradılmış elanın moderasiya statusu: yoxlanılır / təsdiqləndi / rədd (legacy_id = nömrə)."""
+    st, js = auth._req(GRAPHQL, {"query": _AD_STATUS_Q, "variables": {"lid": str(legacy_id)}},
                        headers={"Referer": "https://tap.az/"})
     ad = (js or {}).get("data", {}).get("ad") if isinstance(js, dict) else None
     if not ad:
         return {"ok": False, "resp": js}
     s = ad.get("status")
     label = {"APPROVED": "✅ Təsdiqləndi (canlı)", "PENDING": "🕒 Yoxlanılır",
-             "MODERATION": "🕒 Yoxlanılır", "REJECTED": "❌ Rədd edildi"}.get(s, s)
+             "MODERATION": "🕒 Yoxlanılır", "REJECTED": "❌ Rədd edildi (yenidən düzəlt)"}.get(s, s)
     return {"ok": True, "status": s, "label": label, "reject": ad.get("rejectReason")}
 
 
@@ -202,7 +203,7 @@ def repost(auth, listing_id, contact, dry_run=False):
     res = create_draft(auth, params)
     if not res.get("ok"):
         return {"stage": "createAd", "params": params, "result": res}
-    status = check_status(auth, res["ad_gid"])
+    status = check_status(auth, res.get("legacyId") or res.get("ad_gid"))
     return {"stage": "done", "created": res, "status": status, "source_id": listing_id}
 
 
