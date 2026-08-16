@@ -89,6 +89,13 @@ Vizual + JS təsdiq: bütün bölmələr render olunur, 35 kliklənən bar, JS x
 
 ---
 
+## 🔨 2026-08-16 — Freshness fix + komponent filtrləri + Task 3 analizi
+
+- **Task 1 (freshness):** Kök səbəb tapıldı — 2026-08-13 launchd run-da noutbuklar+komputerler **DNS yarışı** ilə düşmüşdü (Mac 09:00 oyanır, Wi-Fi/DNS hələ qalxmayıb), prune işləməmişdi → 8632 stale vs tap.az 8243. Manual re-crawl ilə prune (noutbuk→8188, komputer→2725). **Həll:** `run_daily.sh`-a şəbəkə-hazırlıq guard-ı (tap.az/graphql curl loop) + kateqoriya uğursuzluğunda macOS bildirişi. **Hər kateqoriya üzrə son yenilənmə tarixi** dashboard-da (`store.cat_last_runs()` → `cat_meta.last`; İcmal kartlarında 🕒 + «köhnə» nişanı; başlıqda son skan + ən köhnə aralıq).
+- **Task 2 (komponent filtrləri):** `radar/comp_specs.py` — name+params parsing (params misparse/truncate olduğu üçün name əsas). CPU (Brend→Seriya→Model), Ana plata (Intel/AMD), RAM (DDR tip→tutum), GPU (Seriya→Model, validasiya whitelist), SSD (Növ→Həcm), Monitor (Gaming/Ofis+OLED+Ölçü+Keyfiyyət+Tezlik). Dashboard-da kaskad facet sistemi (`COMP_FACETS`/`compFacets`/`bindCompFacets`), Cədvəl tabında brenddən sonra.
+- **Task 3 (tap.az posting modulu) — YALNIZ ANALİZ (icra istifadəçi təsdiqini gözləyir):** tam texniki analiz `docs/POSTING-MODULE-analiz.md`. Auth: `api.digit-u.id` (OTP) → GraphQL `loginUser(accessToken)`; elan: `createAd(adParams: CreateAdAttributes!)`; şəkil: `POST photos.tap.az/pond`. Arxitektura: **Mac-local backend** (Cloudflare residential IP). **🔴 Əsas risk: dublikat qaydası** — eyni elanı 30 gün içində yeni `createAd` kimi post = hesab bloku; `prolongAd` alternativi var. **Açıq suallar (icradan əvvəl):** prolongAd vs createAd niyyəti, csrfToken header, /pond auth, CAPTCHA, collection value semantikası, session ömrü.
+- **🔴 Auto-refresh-on-entry (Task 1c) — QƏRAR GÖZLƏNİR:** statik dashboard özü scrape edə bilmir (Cloudflare VPS-i bloklayır). Yalnız **Mac-local backend** ilə mümkündür (Task 3 ilə eyni infrastruktur). Variant: (i) Mac-local Flask servis — dashboard localhost-da açılanda /api/refresh çağırır, SSE ilə "bitdi" bildirişi; (ii) cari statik + timestamp (indi əlavə olundu). Task 3 ilə birlikdə qərar veriləcək.
+
 ## ⚠️ Yarımçıq / açıq suallar
 
 - **Növbədəki tapşırıq:** istifadəçi "növbəti task"-ı sonra bildirəcək (bu session-da tapşırıq verilmədi).
