@@ -778,6 +778,11 @@ function adminView(){
    <div class="small muted">İlk admin parolu Mac-də <code>data/first_admin.txt</code> faylındadır.</div></div>`;
  const isAdmin=su.role==='admin';
  const head=`<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div>👤 <b>${esc(su.username)}</b> <span class="chip" style="cursor:default;background:var(--acc-soft)">${esc(su.role)}</span></div><button class="chip" id="s_logout">Sistemdən çıxış</button></div></div>`;
+ const _lasts=META.cats.map(c=>c.last).filter(Boolean).sort();const _newestL=_lasts[_lasts.length-1]||'—';const _rr=BACKEND.refresh&&BACKEND.refresh.running;
+ const refresh=`<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+   <div><h2 style="margin:0">🔄 Məlumatları yenilə</h2><div class="small muted">tap.az-dan bütün kateqoriyalar yenidən taranır · 🕒 son skan: <b>${esc(_newestL)}</b></div></div>
+   <button class="chip on" id="r_now"${_rr?' disabled':''}>${_rr?'🔄 Yenilənir…':'🔄 İndi yenilə'}</button>
+  </div><div class="small" id="r_msg" style="margin-top:6px">${_rr?'🔄 Hazırda yenilənir… (bir neçə dəqiqə çəkə bilər)':''}</div></div>`;
  const li=BACKEND.logged_in;
  const tlogin=li
   ?`<div class="panel"><h2>🔓 tap.az girişi edilib</h2><div class="controls"><span class="small">tap.az: <b>${esc(BACKEND.user||'—')}</b></span><button class="chip" id="a_logout">tap.az çıxış</button></div></div>`
@@ -798,9 +803,11 @@ function adminView(){
  const users=isAdmin?`<div class="panel"><h2>👥 İstifadəçilər <span class="small">(admin)</span></h2>
    <div class="controls"><input id="u_name" placeholder="username" style="width:130px"><input id="u_pw" type="password" placeholder="parol" style="width:130px"><select id="u_role"><option value="operator">operator</option><option value="admin">admin</option></select><button class="chip on" id="u_add">➕ Əlavə et</button></div>
    <div id="u_list" class="muted" style="margin-top:8px">Yüklənir…</div></div>`:'';
- return head+tlogin+repost+settings+users;
+ return head+refresh+tlogin+repost+settings+users;
 }
 function bindAdmin(){const g=id=>document.getElementById(id);const J={'Content-Type':'application/json'};
+ if(g('r_now'))g('r_now').onclick=async()=>{const b=g('r_now');b.disabled=true;b.textContent='🔄 Yenilənir…';g('r_msg').innerHTML='🔄 tap.az yenilənir… (bir neçə dəqiqə çəkə bilər)';const r=await api('/api/refresh',{method:'POST',headers:J,body:'{}'});if(r&&r.error){g('r_msg').innerHTML='⚠️ '+esc(JSON.stringify(r).slice(0,200));b.disabled=false;b.textContent='🔄 İndi yenilə';return;}banner('🔄 tap.az məlumatları yenilənir…');setTimeout(pollRefresh,3000);};
+ if(BACKEND&&BACKEND.refresh&&BACKEND.refresh.running){setTimeout(pollRefresh,2000);}
  if(g('s_login'))g('s_login').onclick=async()=>{const r=await api('/api/user/login',{method:'POST',headers:J,body:JSON.stringify({username:g('s_user').value,password:g('s_pw').value})});if(r.ok){await checkBackend();buildNav();render();}else g('s_msg').innerHTML='⚠️ '+esc(r.error||'giriş alınmadı');};
  if(g('s_logout'))g('s_logout').onclick=async()=>{await api('/api/user/logout',{method:'POST'});await checkBackend();buildNav();render();};
  if(g('s_savekey'))g('s_savekey').onclick=async()=>{const r=await api('/api/settings/set',{method:'POST',headers:J,body:JSON.stringify({openai_key:g('s_aikey').value.trim()})});g('s_keymsg').innerHTML=r.ok?'✅ Açar saxlanıldı':('⚠️ '+esc(JSON.stringify(r).slice(0,150)));await checkBackend();};
