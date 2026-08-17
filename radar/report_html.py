@@ -219,11 +219,13 @@ function distinct(field,cat){const s=new Set();DATA.forEach(r=>{if(cat&&r.catego
 const NAV=[['overview','📊 İcmal'],['best','⭐ Ən uyğun'],['new','🆕 Yeni'],['SEP','Kateqoriyalar'],
  ...META.cats.map(c=>['cat:'+c.slug,c.label,c.n]),['SEP','Alətlər'],
  ['analysis','📈 Parametr analizi'],['stars','⭐ Seçilmişlər'],['SEP','İdarəetmə (backend)'],
- ['admin','🛠 Repost / Yenilə']];
+ ['admin','🛠 Repost / Yenilə'],['settings','⚙️ Tənzimləmələr'],['users','👥 İstifadəçilər']];
 function buildNav(){
  const n=$('#nav');n.innerHTML='';
+ const _isAdm=BACKEND&&BACKEND.sys&&BACKEND.sys.role==='admin';
  NAV.forEach(item=>{
-  if(!BACKEND && (item[0]==='admin' || item[1]==='İdarəetmə (backend)'))return; // backend yoxdursa gizlət
+  if(!BACKEND && (item[0]==='admin'||item[0]==='settings'||item[0]==='users' || item[1]==='İdarəetmə (backend)'))return; // backend yoxdursa gizlət
+  if((item[0]==='settings'||item[0]==='users')&&!_isAdm)return; // yalnız admin girişində
   if(item[0]==='SEP'){const d=document.createElement('div');d.className='sep';d.textContent=item[1];n.appendChild(d);return;}
   const b=document.createElement('button');b.dataset.k=item[0];
   b.innerHTML=`<span>${item[1]}</span>`+(item[2]!=null?`<span class="cnt">${item[2]}</span>`:'');
@@ -752,8 +754,14 @@ function render1(){
   root.innerHTML=rows.length?`<div class="panel"><div class="tblwrap">${tableHTML(rows)}</div>${pager(rows.length)}</div>`:'<div class="panel muted">Hələ heç nə seçməmisən. Cədvəldə ★ ulduza kliklə.</div>';
   bindTable();if(rows.length)bindPager();
  } else if(v==='admin'){
-  title='🛠 Repost / Yenilə';sub='backend (Mac-local) tələb olunur';
+  title='🛠 Repost / Yenilə';sub='köhnə elan → draft → təsdiq';
   root.innerHTML=adminView();bindAdmin();
+ } else if(v==='settings'){
+  title='⚙️ Tənzimləmələr';sub='OpenAI açarı (admin)';
+  root.innerHTML=settingsView();bindAdmin();
+ } else if(v==='users'){
+  title='👥 İstifadəçilər';sub='giriş və rollar (admin)';
+  root.innerHTML=usersView();bindAdmin();
  }
  $('#vtitle').textContent=title;$('#vsub').textContent=sub;
 }
@@ -769,15 +777,19 @@ function analysisPanel(title,key,rows,fmtk=x=>x,cmp){
 let BACKEND=null;
 async function api(path,opts){try{const r=await fetch(path,opts);return await r.json();}catch(e){return {error:''+e};}}
 async function checkBackend(){const s=await api('/api/status');BACKEND=(s&&s.ok)?s:false;return BACKEND;}
-function adminView(){
+function _sysGate(){ // authorized olmayanda HTML qaytarır, olanda ''
  if(!BACKEND)return `<div class="panel muted" style="line-height:1.7">⚠️ Bu funksiya yalnız <b>Mac-local backend</b> ilə işləyir (Cloudflare VPS-i tap.az-a buraxmır).<br>Terminalda: <code>./run_backend.sh</code> → <b>http://127.0.0.1:8091/</b> (və ya sslip URL).</div>`;
- const su=BACKEND.sys;
- if(!su)return `<div class="panel"><h2>🔐 Sistemə giriş</h2>
+ if(!BACKEND.sys)return `<div class="panel"><h2>🔐 Sistemə giriş</h2>
    <div class="controls"><input id="s_user" value="admin" placeholder="istifadəçi adı" style="width:160px"><input id="s_pw" type="password" placeholder="parol" style="width:160px" onkeydown="if(event.key==='Enter')document.getElementById('s_login').click()"><button class="chip on" id="s_login">Giriş</button></div>
    <div class="small" id="s_msg" style="margin-top:6px"></div>
    <div class="small muted">İstifadəçi adı: <b>admin</b> · parol Mac-də <code>data/first_admin.txt</code> faylındadır.<br>⚠️ Bu <b>telefon girişi deyil</b> — telefon+SMS tap.az bölməsi bu girişdən <b>sonra</b> görünür.</div></div>`;
- const isAdmin=su.role==='admin';
- const head=`<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div>👤 <b>${esc(su.username)}</b> <span class="chip" style="cursor:default;background:var(--acc-soft)">${esc(su.role)}</span></div><button class="chip" id="s_logout">Sistemdən çıxış</button></div></div>`;
+ return '';
+}
+function _sysHead(){const su=BACKEND.sys;return `<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div>👤 <b>${esc(su.username)}</b> <span class="chip" style="cursor:default;background:var(--acc-soft)">${esc(su.role)}</span></div><button class="chip" id="s_logout">Sistemdən çıxış</button></div></div>`;}
+function _adminOnly(what){return `<div class="panel muted">🔒 <b>${what}</b> yalnız <b>admin</b> rolu üçündür. Sən <b>operator</b> kimi girmisən.</div>`;}
+// ---- 1) Repost / Yenilə səhifəsi ----
+function adminView(){
+ const gate=_sysGate();if(gate)return gate;
  const _lasts=META.cats.map(c=>c.last).filter(Boolean).sort();const _newestL=_lasts[_lasts.length-1]||'—';const _rr=BACKEND.refresh&&BACKEND.refresh.running;
  const refresh=`<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
    <div><h2 style="margin:0">🔄 Məlumatları yenilə</h2><div class="small muted">tap.az-dan bütün kateqoriyalar yenidən taranır · 🕒 son skan: <b>${esc(_newestL)}</b></div></div>
@@ -797,13 +809,25 @@ function adminView(){
    <div class="small muted">Elan <b>BİZİM sistemə</b> gəlir → AI PCTECH uyğunlaşdırma → yoxlama → <b>təsdiqdən sonra</b> tap.az. tap.az-a birbaşa getmir.</div>
    <div id="a_result" style="margin-top:10px"></div></div>
    <div class="panel"><h2>📋 Draftlar <span class="small">— bizim sistem</span></h2><div id="a_drafts" class="muted">Yüklənir…</div></div>`;
- const settings=isAdmin?`<div class="panel"><h2>⚙️ Tənzimləmələr</h2>
+ return _sysHead()+refresh+tlogin+repost;
+}
+// ---- 2) Tənzimləmələr səhifəsi ----
+function settingsView(){
+ const gate=_sysGate();if(gate)return gate;
+ if(BACKEND.sys.role!=='admin')return _sysHead()+_adminOnly('Tənzimləmələr');
+ return _sysHead()+`<div class="panel"><h2>⚙️ Tənzimləmələr</h2>
    <div class="controls"><span class="small" style="align-self:center;font-weight:700">OpenAI açarı:</span><input id="s_aikey" type="password" placeholder="sk-..." style="width:280px"><button class="chip on" id="s_savekey">💾 Saxla</button></div>
-   <div class="small" id="s_keymsg">${BACKEND.ai_key?'✅ OpenAI açarı təyin olunub':'⚠️ Açar yoxdur — AI (PCTECH) üçün lazımdır'}</div></div>`:'';
- const users=isAdmin?`<div class="panel"><h2>👥 İstifadəçilər <span class="small">(admin)</span></h2>
+   <div class="small" id="s_keymsg">${BACKEND.ai_key?'✅ OpenAI açarı təyin olunub':'⚠️ Açar yoxdur — AI (PCTECH) üçün lazımdır'}</div>
+   <div class="small muted" style="margin-top:6px">Açar <code>data/secrets.json</code> faylında (0600, git-ə düşmür) saxlanır. AI PCTECH mətn + şəkil generasiyası üçün lazımdır.</div></div>`;
+}
+// ---- 3) İstifadəçilər səhifəsi ----
+function usersView(){
+ const gate=_sysGate();if(gate)return gate;
+ if(BACKEND.sys.role!=='admin')return _sysHead()+_adminOnly('İstifadəçilər');
+ return _sysHead()+`<div class="panel"><h2>👥 İstifadəçilər <span class="small">(admin)</span></h2>
    <div class="controls"><input id="u_name" placeholder="username" style="width:130px"><input id="u_pw" type="password" placeholder="parol" style="width:130px"><select id="u_role"><option value="operator">operator</option><option value="admin">admin</option></select><button class="chip on" id="u_add">➕ Əlavə et</button></div>
-   <div id="u_list" class="muted" style="margin-top:8px">Yüklənir…</div></div>`:'';
- return head+refresh+tlogin+repost+settings+users;
+   <div id="u_list" class="muted" style="margin-top:8px">Yüklənir…</div>
+   <div class="small muted" style="margin-top:8px"><b>admin</b> = hər şey · <b>operator</b> = yalnız Repost/Yenilə + draft (Tənzimləmələr və İstifadəçilər yox).</div></div>`;
 }
 function bindAdmin(){const g=id=>document.getElementById(id);const J={'Content-Type':'application/json'};
  if(g('r_now'))g('r_now').onclick=async()=>{const b=g('r_now');b.disabled=true;b.textContent='🔄 Yenilənir…';g('r_msg').innerHTML='🔄 tap.az yenilənir… (bir neçə dəqiqə çəkə bilər)';const r=await api('/api/refresh',{method:'POST',headers:J,body:'{}'});if(r&&r.error){g('r_msg').innerHTML='⚠️ '+esc(JSON.stringify(r).slice(0,200));b.disabled=false;b.textContent='🔄 İndi yenilə';return;}banner('🔄 tap.az məlumatları yenilənir…');setTimeout(pollRefresh,3000);};
