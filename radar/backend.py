@@ -319,6 +319,24 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"error": r["error"]})
             _DRAFTS.save_ai_photo(did, idx, r)
             return self._send(200, {"ok": True, "index": idx})
+        if path == "/api/draft/replace-photo":  # operator ÖZ şəklini yükləyir → ai_<index> əvəz/əlavə
+            did = int(data.get("id")); idx = int(data.get("index", 0))
+            d = _DRAFTS.get(did)
+            if not d:
+                return self._send(404, {"error": "draft yoxdur"})
+            b64 = data.get("b64") or ""
+            if not b64[:32].lower().startswith("data:image/"):
+                return self._send(200, {"error": "yalnız şəkil (jpg / png / webp)"})
+            try:
+                raw = base64.b64decode(b64.split(",", 1)[1])
+            except Exception as e:
+                return self._send(200, {"error": f"şəkil oxunmadı: {str(e)[:80]}"})
+            if len(raw) > 15 * 1024 * 1024:
+                return self._send(200, {"error": "şəkil çox böyükdür (15 MB limit)"})
+            if idx < 0:
+                idx = d.get("n_ai_photos") or 0  # -1 → sona əlavə et
+            _DRAFTS.save_ai_photo(did, idx, raw)
+            return self._send(200, {"ok": True, "index": idx})
         if path == "/api/draft/approve":  # BİZİM təsdiq → İNDİ tap.az-a göndər (createAd)
             if not _AUTH.user:
                 return self._send(401, {"error": "login lazımdır"})

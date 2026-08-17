@@ -54,9 +54,12 @@ class DraftStore:
         return open(p, "rb").read() if os.path.exists(p) else None
 
     def save_ai_photo(self, did, i, data):
-        """Tək brendlənmiş şəkli (ai_<i>.jpg) yenisi ilə əvəz et."""
+        """Tək brendlənmiş şəkli (ai_<i>.jpg) yaz/əvəz et. n_ai_photos ən azı i+1 olur (əlavə üçün)."""
         d = os.path.join(MEDIA, str(did)); os.makedirs(d, exist_ok=True)
         open(os.path.join(d, f"ai_{i}.jpg"), "wb").write(data)
+        self.db.execute("UPDATE drafts SET n_ai_photos=MAX(COALESCE(n_ai_photos,0), ?), ai_status='done' WHERE id=?",
+                        (i + 1, did))
+        self.db.commit()
         return True
 
     def create(self, source_id, data, image_bytes_list):
