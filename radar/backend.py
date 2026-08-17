@@ -25,10 +25,12 @@ PY = os.environ.get("RADAR_PY", "python3")
 from radar import poster
 from radar.tapaz_auth import AuthClient
 from radar.drafts import DraftStore, MEDIA as DRAFT_MEDIA
+from radar.users import Users
 
 _AUTH = AuthClient(verbose=True)  # digit-u xam cavablarını jurnalla (debug)
 _AUTH.load()  # Keychain-dən mövcud sessiya
 _DRAFTS = DraftStore()  # BİZİM sistemin daxili qaralama qatı
+_USERS = Users()  # sistem istifadəçiləri (admin/operator)
 _REFRESH = {"running": False, "started": None, "done": None, "log": "", "code": None}
 
 
@@ -62,6 +64,22 @@ class H(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length", 0))
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
 
+    def _sysuser(self):
+        tok = None
+        for part in (self.headers.get("Cookie", "") or "").split(";"):
+            if part.strip().startswith("sys_session="):
+                tok = part.strip()[len("sys_session="):]
+        return _USERS.user_for_token(tok or self.headers.get("X-Sys-Token"))
+
+    def _set_cookie(self, code, body, token):
+        b = json.dumps(body, ensure_ascii=False).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Set-Cookie", f"sys_session={token}; Path=/; Max-Age=2592000; SameSite=Lax")
+        self.send_header("Content-Length", str(len(b)))
+        self.end_headers()
+        self.wfile.write(b)
+
     def log_message(self, *a):
         pass
 
@@ -77,11 +95,25 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, open(f, "rb").read(), "text/html; charset=utf-8")
             return self._send(404, {"error": "dashboard yoxdur — run.py işlət"})
         if path == "/api/status":
+            su = self._sysuser()
+            from radar import ai_brand
             return self._send(200, {
                 "ok": True, "logged_in": bool(_AUTH.user),
                 "user": (_AUTH.user or {}).get("name") if _AUTH.user else None,
+                "sys": su, "ai_key": ai_brand.has_key(),
                 "refresh": {k: _REFRESH[k] for k in ("running", "started", "done", "code")},
             })
+        if path == "/api/user/me":
+            return self._send(200, {"user": self._sysuser()})
+        if path == "/api/user/list":
+            if (self._sysuser() or {}).get("role") != "admin":
+                return self._send(403, {"error": "yalnız admin"})
+            return self._send(200, {"users": _USERS.list()})
+        if path == "/api/settings/get":
+            from radar import ai_brand
+            k = ai_brand._key()
+            return self._send(200, {"ai_key_set": bool(k), "ai_key_masked": (k[:6] + "…" + k[-4:]) if k else None,
+                                    "brand": ai_brand.load_brand().get("name")})
         if path == "/api/refresh-status":
             return self._send(200, _REFRESH)
         if path == "/api/auth/whoami":
@@ -109,6 +141,32 @@ class H(BaseHTTPRequestHandler):
             data = self._json()
         except Exception:
             data = {}
+        # --- Sistem istifadəçi auth ---
+        if path == "/api/user/login":
+            r = _USERS.login(data.get("username", ""), data.get("password", ""))
+            return self._set_cookie(200, {"ok": True, "user": r["user"]}, r["token"]) if r.get("ok") else self._send(401, r)
+        if path == "/api/user/logout":
+            for part in (self.headers.get("Cookie", "") or "").split(";"):
+                if part.strip().startswith("sys_session="):
+                    _USERS.logout(part.strip()[len("sys_session="):])
+            return self._send(200, {"ok": True})
+        su = self._sysuser()
+        is_admin = (su or {}).get("role") == "admin"
+        if path == "/api/user/create":
+            return self._send(200, _USERS.create(data.get("username", ""), data.get("password", ""), data.get("role", "operator"))) if is_admin else self._send(403, {"error": "yalnız admin"})
+        if path == "/api/user/delete":
+            return self._send(200, _USERS.delete(data.get("username", ""))) if is_admin else self._send(403, {"error": "yalnız admin"})
+        if path == "/api/user/set-password":
+            target = data.get("username") if (is_admin and data.get("username")) else (su or {}).get("username")
+            return self._send(200, _USERS.set_password(target, data.get("password", ""))) if target else self._send(401, {"error": "giriş lazımdır"})
+        if path == "/api/settings/set":
+            if not is_admin:
+                return self._send(403, {"error": "yalnız admin"})
+            from radar import ai_brand
+            return self._send(200, ai_brand.set_key(data.get("openai_key", "").strip()))
+        # rol qapısı — draft/AI əməliyyatları sistem girişi tələb edir (operator+admin)
+        if path.startswith("/api/draft/") and not su:
+            return self._send(401, {"error": "sistemə giriş lazımdır (login)"})
         if path == "/api/refresh":
             if _REFRESH["running"]:
                 return self._send(200, {"ok": True, "note": "artıq gedir"})

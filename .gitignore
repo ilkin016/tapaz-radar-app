@@ -5,3 +5,7 @@ deploy/site/
 __pycache__/
 *.pyc
 .DS_Store
+
+# həssas — sistem sirləri
+data/secrets.json
+data/first_admin.txt

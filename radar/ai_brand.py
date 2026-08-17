@@ -20,7 +20,30 @@ def load_brand():
 
 
 def _key():
-    return os.environ.get("OPENAI_API_KEY") or load_brand().get("openai_api_key")
+    k = os.environ.get("OPENAI_API_KEY")
+    if k:
+        return k
+    try:
+        s = json.load(open(os.path.join(ROOT, "data", "secrets.json"), encoding="utf-8"))
+        if s.get("openai_api_key"):
+            return s["openai_api_key"]
+    except Exception:
+        pass
+    return load_brand().get("openai_api_key")
+
+
+def set_key(key):
+    """OpenAI açarını data/secrets.json-a saxla (gitignore, 0600)."""
+    p = os.path.join(ROOT, "data", "secrets.json")
+    s = {}
+    try:
+        s = json.load(open(p, encoding="utf-8"))
+    except Exception:
+        pass
+    s["openai_api_key"] = key
+    open(p, "w", encoding="utf-8").write(json.dumps(s))
+    os.chmod(p, 0o600)
+    return {"ok": True}
 
 
 def has_key():

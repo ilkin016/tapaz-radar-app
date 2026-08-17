@@ -73,9 +73,12 @@ _TEMPLATE = r"""<!doctype html><html lang="az"><head><meta charset="utf-8">
 :root{--bg:#f3f6fb;--panel:#ffffff;--panel2:#f7f9fd;--ink:#0f172a;--muted:#64748b;--line:#e6ecf5;--acc:#1d4ed8;--acc2:#2563eb;
  --acc-soft:#e9f0fe;--good:#15803d;--bad:#b91c1c;--warn:#b45309;--chip:#eef2f9;
  --shadow:0 1px 2px rgba(15,23,42,.05),0 2px 8px rgba(15,23,42,.05);--radius:14px}
-@media(prefers-color-scheme:dark){:root{--bg:#070c15;--panel:#0f1826;--panel2:#0c1421;--ink:#e6eef8;--muted:#8aa0b8;--line:#1d2b3f;
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#070c15;--panel:#0f1826;--panel2:#0c1421;--ink:#e6eef8;--muted:#8aa0b8;--line:#1d2b3f;
  --acc:#3b82f6;--acc2:#60a5fa;--acc-soft:#14243a;--chip:#152131;
  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.4)}}
+:root[data-theme="dark"]{--bg:#070c15;--panel:#0f1826;--panel2:#0c1421;--ink:#e6eef8;--muted:#8aa0b8;--line:#1d2b3f;
+ --acc:#3b82f6;--acc2:#60a5fa;--acc-soft:#14243a;--chip:#152131;
+ --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.4)}
 *{box-sizing:border-box}html,body{margin:0;height:100%}
 body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:13px;-webkit-font-smoothing:antialiased}
 .app{display:grid;grid-template-columns:224px 1fr;height:100vh}
@@ -186,7 +189,8 @@ a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
    <button class="chip mtoggle" onclick="document.getElementById('side').classList.toggle('open')">☰</button>
    <h1 id="vtitle">İcmal</h1><span class="sub" id="vsub"></span>
    <span style="flex:1"></span>
-   <input id="q" placeholder="🔎 Axtar (ad, parametr, satıcı)…" style="min-width:240px">
+   <input id="q" placeholder="🔎 Axtar (ad, parametr, satıcı)…" style="min-width:200px">
+   <button class="chip" id="themebtn" title="Tema" onclick="cycleTheme()" style="font-size:15px">🌓</button>
   </div>
   <div id="root"></div>
  </div>
@@ -199,6 +203,9 @@ const esc=s=>(s==null?'':(''+s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 const store={get(){try{return new Set(JSON.parse(localStorage.getItem('radar_star')||'[]'))}catch(e){return new Set()}},
  set(s){localStorage.setItem('radar_star',JSON.stringify([...s]))}};
 let STAR=store.get();
+function applyTheme(t){const r=document.documentElement;if(t==='light'||t==='dark')r.setAttribute('data-theme',t);else r.removeAttribute('data-theme');const b=document.getElementById('themebtn');if(b)b.textContent=t==='light'?'☀️':(t==='dark'?'🌙':'🌓');}
+function cycleTheme(){const c=localStorage.getItem('radar_theme')||'system';const n=c==='system'?'light':(c==='light'?'dark':'system');localStorage.setItem('radar_theme',n);applyTheme(n);}
+applyTheme(localStorage.getItem('radar_theme')||'system');
 function daysAgo(d){if(!d)return null;const t=new Date(d+'T00:00:00'),n=new Date();return Math.floor((n-t)/86400000);}
 function staleBadge(d){const a=daysAgo(d);if(a==null)return '';return a>2?` <span style="color:var(--bad);font-weight:700">⚠️ ${a} gün köhnə</span>`:(a<=0?` <span style="color:var(--good);font-weight:700">✓ bu gün</span>`:` <span class="muted">${a} gün əvvəl</span>`);}
 {const dts=META.cats.map(c=>c.last).filter(Boolean).sort();const oldest=dts[0]||META.run_ts.slice(0,10),newest=dts[dts.length-1]||oldest;
@@ -763,25 +770,42 @@ let BACKEND=null;
 async function api(path,opts){try{const r=await fetch(path,opts);return await r.json();}catch(e){return {error:''+e};}}
 async function checkBackend(){const s=await api('/api/status');BACKEND=(s&&s.ok)?s:false;return BACKEND;}
 function adminView(){
- if(!BACKEND)return `<div class="panel muted" style="line-height:1.7">⚠️ Bu funksiya yalnız <b>Mac-local backend</b> ilə işləyir (Cloudflare VPS-i tap.az-a buraxmır).<br>Terminalda: <code>cd ~/tapaz-radar &amp;&amp; python3 -m radar.backend</code><br>sonra dashboard-u <b>http://127.0.0.1:8091/</b> ünvanından aç.</div>`;
+ if(!BACKEND)return `<div class="panel muted" style="line-height:1.7">⚠️ Bu funksiya yalnız <b>Mac-local backend</b> ilə işləyir (Cloudflare VPS-i tap.az-a buraxmır).<br>Terminalda: <code>./run_backend.sh</code> → <b>http://127.0.0.1:8091/</b> (və ya sslip URL).</div>`;
+ const su=BACKEND.sys;
+ if(!su)return `<div class="panel"><h2>🔐 Sistemə giriş</h2>
+   <div class="controls"><input id="s_user" placeholder="İstifadəçi" style="width:160px"><input id="s_pw" type="password" placeholder="Parol" style="width:160px" onkeydown="if(event.key==='Enter')document.getElementById('s_login').click()"><button class="chip on" id="s_login">Giriş</button></div>
+   <div class="small" id="s_msg" style="margin-top:6px"></div>
+   <div class="small muted">İlk admin parolu Mac-də <code>data/first_admin.txt</code> faylındadır.</div></div>`;
+ const isAdmin=su.role==='admin';
+ const head=`<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div>👤 <b>${esc(su.username)}</b> <span class="chip" style="cursor:default;background:var(--acc-soft)">${esc(su.role)}</span></div><button class="chip" id="s_logout">Sistemdən çıxış</button></div></div>`;
  const li=BACKEND.logged_in;
- const login=li
-  ?`<div class="panel"><h2>🔓 tap.az girişi edilib</h2><div class="controls"><span class="small">İstifadəçi: <b>${esc(BACKEND.user||'—')}</b></span><button class="chip" id="a_logout">Çıxış</button></div></div>`
+ const tlogin=li
+  ?`<div class="panel"><h2>🔓 tap.az girişi edilib</h2><div class="controls"><span class="small">tap.az: <b>${esc(BACKEND.user||'—')}</b></span><button class="chip" id="a_logout">tap.az çıxış</button></div></div>`
   :`<div class="panel"><h2>🔑 tap.az girişi (OTP)</h2>
      <div class="controls"><input id="a_phone" placeholder="0XX XXX XX XX" style="width:180px"><button class="chip on" id="a_send">📩 Kod göndər</button></div>
      <div class="controls" id="a_coderow" style="display:none"><input id="a_code" placeholder="SMS kodu" style="width:140px"><button class="chip on" id="a_verify">✓ Təsdiqlə</button></div>
      <div class="small" id="a_authmsg" style="margin-top:4px"></div>
-     <div class="small muted">Kod SƏNİN telefonuna gəlir və SƏN daxil edirsən (təhlükəsizlik — mən OTP-yə toxunmuram).</div></div>`;
+     <div class="small muted">Kod SƏNİN telefonuna gəlir və SƏN daxil edirsən (təhlükəsizlik).</div></div>`;
  const repost=`<div class="panel"><h2>📥 Köhnə elanı BİZİM sistemə gətir (draft)</h2>
    <div class="controls"><input id="a_lid" placeholder="Elan nömrəsi (məs 48251733)" style="width:230px">
-    <button class="chip" id="a_preview">👁 Önizləmə</button>
-    <button class="chip on" id="a_post">📥 Sistemə gətir</button></div>
-   <div class="small muted">Elan <b>BİZİM sistemə</b> (draft) gəlir — mətn/şəkil BURADA yoxlanılır. <b>tap.az-a heç nə getmir.</b> Yalnız burada təsdiqdən sonra tap.az moderasiyasına göndərilir.</div>
+    <button class="chip" id="a_preview">👁 Önizləmə</button><button class="chip on" id="a_post">📥 Sistemə gətir</button></div>
+   <div class="small muted">Elan <b>BİZİM sistemə</b> gəlir → AI PCTECH uyğunlaşdırma → yoxlama → <b>təsdiqdən sonra</b> tap.az. tap.az-a birbaşa getmir.</div>
    <div id="a_result" style="margin-top:10px"></div></div>
-   <div class="panel"><h2>📋 Draftlar <span class="small">— bizim sistemdə yoxlama</span></h2><div id="a_drafts" class="muted">Yüklənir…</div></div>`;
- return login+repost;
+   <div class="panel"><h2>📋 Draftlar <span class="small">— bizim sistem</span></h2><div id="a_drafts" class="muted">Yüklənir…</div></div>`;
+ const settings=isAdmin?`<div class="panel"><h2>⚙️ Tənzimləmələr</h2>
+   <div class="controls"><span class="small" style="align-self:center;font-weight:700">OpenAI açarı:</span><input id="s_aikey" type="password" placeholder="sk-..." style="width:280px"><button class="chip on" id="s_savekey">💾 Saxla</button></div>
+   <div class="small" id="s_keymsg">${BACKEND.ai_key?'✅ OpenAI açarı təyin olunub':'⚠️ Açar yoxdur — AI (PCTECH) üçün lazımdır'}</div></div>`:'';
+ const users=isAdmin?`<div class="panel"><h2>👥 İstifadəçilər <span class="small">(admin)</span></h2>
+   <div class="controls"><input id="u_name" placeholder="username" style="width:130px"><input id="u_pw" type="password" placeholder="parol" style="width:130px"><select id="u_role"><option value="operator">operator</option><option value="admin">admin</option></select><button class="chip on" id="u_add">➕ Əlavə et</button></div>
+   <div id="u_list" class="muted" style="margin-top:8px">Yüklənir…</div></div>`:'';
+ return head+tlogin+repost+settings+users;
 }
 function bindAdmin(){const g=id=>document.getElementById(id);const J={'Content-Type':'application/json'};
+ if(g('s_login'))g('s_login').onclick=async()=>{const r=await api('/api/user/login',{method:'POST',headers:J,body:JSON.stringify({username:g('s_user').value,password:g('s_pw').value})});if(r.ok){await checkBackend();buildNav();render();}else g('s_msg').innerHTML='⚠️ '+esc(r.error||'giriş alınmadı');};
+ if(g('s_logout'))g('s_logout').onclick=async()=>{await api('/api/user/logout',{method:'POST'});await checkBackend();buildNav();render();};
+ if(g('s_savekey'))g('s_savekey').onclick=async()=>{const r=await api('/api/settings/set',{method:'POST',headers:J,body:JSON.stringify({openai_key:g('s_aikey').value.trim()})});g('s_keymsg').innerHTML=r.ok?'✅ Açar saxlanıldı':('⚠️ '+esc(JSON.stringify(r).slice(0,150)));await checkBackend();};
+ if(g('u_add'))g('u_add').onclick=async()=>{const r=await api('/api/user/create',{method:'POST',headers:J,body:JSON.stringify({username:g('u_name').value,password:g('u_pw').value,role:g('u_role').value})});if(r.ok){g('u_name').value='';g('u_pw').value='';loadUsers();}else alert(r.error||'xəta');};
+ if(g('u_list'))loadUsers();
  if(g('a_send'))g('a_send').onclick=async()=>{const p=g('a_phone').value.trim();if(!p)return;g('a_authmsg').textContent='Göndərilir…';const r=await api('/api/auth/send-code',{method:'POST',headers:J,body:JSON.stringify({phone:p})});g('a_coderow').style.display='flex';g('a_authmsg').innerHTML=r.ok?'✅ Kod göndərildi — telefonuna bax':('⚠️ '+esc(JSON.stringify(r).slice(0,220)));};
  if(g('a_verify'))g('a_verify').onclick=async()=>{g('a_authmsg').textContent='Yoxlanılır…';const r=await api('/api/auth/verify',{method:'POST',headers:J,body:JSON.stringify({phone:g('a_phone').value.trim(),code:g('a_code').value.trim()})});if(r.ok&&r.login&&r.login.ok){await checkBackend();render();}else g('a_authmsg').innerHTML='⚠️ '+esc(JSON.stringify(r).slice(0,220));};
  if(g('a_logout'))g('a_logout').onclick=async()=>{await api('/api/auth/logout',{method:'POST'});await checkBackend();render();};
@@ -798,6 +822,9 @@ async function loadDrafts(){const el=document.getElementById('a_drafts');if(!el)
    </div><div id="dv_${d.id}" style="display:none;margin-top:8px"></div></div>`).join('');
  bindDrafts();
 }
+async function loadUsers(){const el=document.getElementById('u_list');if(!el)return;const r=await api('/api/user/list');const us=(r.users||[]);
+ el.innerHTML=us.map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)"><span><b>${esc(u.username)}</b> <span class="chip" style="cursor:default;font-size:10px">${esc(u.role)}</span> <span class="small">${esc(u.created_at||'')}</span></span><button class="chip" data-udel="${esc(u.username)}">🗑</button></div>`).join('')||'<span class="muted">yox</span>';
+ el.querySelectorAll('[data-udel]').forEach(b=>b.onclick=async()=>{if(!confirm('İstifadəçi «'+b.dataset.udel+'» silinsin?'))return;await api('/api/user/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:b.dataset.udel})});loadUsers();});}
 function bindDrafts(){const g=id=>document.getElementById(id);const J={'Content-Type':'application/json'};
  document.querySelectorAll('[data-dv]').forEach(b=>b.onclick=async()=>{const id=b.dataset.dv,box=g('dv_'+id);if(box.style.display==='block'){box.style.display='none';return;}const d=await api('/api/draft/get?id='+id);box.style.display='block';
   const aiOn=(d.n_ai_photos||0)>0||d.adapted_title;
