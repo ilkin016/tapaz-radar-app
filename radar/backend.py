@@ -14,7 +14,7 @@ Endpoint-lər:
   GET  /api/repost-status    → {ad_gid} → moderasiya statusu
 
 Stdlib (http.server) — əlavə asılılıq yox."""
-import json, os, threading, subprocess, time, urllib.parse
+import json, os, threading, subprocess, time, urllib.parse, base64, re, io
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -32,6 +32,46 @@ _AUTH.load()  # Keychain-dən mövcud sessiya
 _DRAFTS = DraftStore()  # BİZİM sistemin daxili qaralama qatı
 _USERS = Users()  # sistem istifadəçiləri (admin/operator)
 _REFRESH = {"running": False, "started": None, "done": None, "log": "", "code": None}
+_BULK = {"running": False, "total": 0, "done": 0, "ok": 0, "fail": 0, "skip": 0, "errors": [], "started": None}
+_ID_RE = re.compile(r"(\d{6,9})")
+
+
+def _extract_ids(text):
+    """Sərbəst mətndən (link və/və ya kod, hər sətir/vergül) tap.az elan nömrələrini çıxar, təkrarları at."""
+    ids, seen = [], set()
+    for m in _ID_RE.findall(text or ""):
+        if m not in seen:
+            seen.add(m); ids.append(m)
+    return ids
+
+
+def _run_bulk(ids):
+    """Arxa fonda: hər nömrə üçün elanı oxu + şəkilləri endir + draft yarat. Mövcud olanları ötür."""
+    existing = {str(d.get("source_id")) for d in _DRAFTS.list()}
+    _BULK.update(running=True, total=len(ids), done=0, ok=0, fail=0, skip=0, errors=[],
+                 started=time.strftime("%H:%M:%S"))
+    for lid in ids:
+        if _REFRESH["running"]:
+            _BULK["errors"].append("Skan başladı — dayandırıldı"); break
+        if str(lid) in existing:
+            _BULK["skip"] += 1; _BULK["done"] += 1; continue
+        try:
+            ad = poster.read_ad_for_repost(lid)
+            if ad.get("error"):
+                _BULK["fail"] += 1; _BULK["errors"].append(f"#{lid}: {ad['error'][:60]}")
+            else:
+                imgs = []
+                for u in ad.get("photos", []):
+                    try:
+                        imgs.append(poster.download_photo(u))
+                    except Exception:
+                        pass
+                _DRAFTS.create(lid, ad, imgs)
+                existing.add(str(lid)); _BULK["ok"] += 1
+        except Exception as e:
+            _BULK["fail"] += 1; _BULK["errors"].append(f"#{lid}: {str(e)[:60]}")
+        _BULK["done"] += 1
+    _BULK["running"] = False
 
 
 def _run_refresh(only=None):
@@ -124,6 +164,8 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, poster.check_status(_AUTH, q.get("legacy_id") or q.get("ad_gid")))
         if path == "/api/draft/list":
             return self._send(200, {"drafts": _DRAFTS.list(q.get("status"))})
+        if path == "/api/draft/bulk-status":
+            return self._send(200, _BULK)
         if path == "/api/draft/get":
             d = _DRAFTS.get(int(q.get("id", 0)))
             return self._send(200, d) if d else self._send(404, {"error": "draft yoxdur"})
@@ -202,6 +244,38 @@ class H(BaseHTTPRequestHandler):
                     pass
             did = _DRAFTS.create(data.get("listing_id"), ad, imgs)
             return self._send(200, {"ok": True, "draft_id": did})
+        if path == "/api/draft/bulk-create":  # toplu: sərbəst mətndən linkləri/kodları çıxar → draftlar
+            if _REFRESH["running"]:
+                return self._send(200, {"error": "Skan gedir — bitəndən sonra"})
+            if _BULK["running"]:
+                return self._send(200, {"error": "Toplu import artıq gedir"})
+            ids = _extract_ids(data.get("text", ""))
+            if not ids:
+                return self._send(200, {"error": "Heç bir elan nömrəsi tapılmadı (6-9 rəqəm)"})
+            threading.Thread(target=_run_bulk, args=(ids,), daemon=True).start()
+            return self._send(200, {"ok": True, "total": len(ids)})
+        if path == "/api/draft/import-excel":  # Excel (.xlsx) → nömrələr → toplu draft
+            if _REFRESH["running"]:
+                return self._send(200, {"error": "Skan gedir — bitəndən sonra"})
+            if _BULK["running"]:
+                return self._send(200, {"error": "Toplu import artıq gedir"})
+            try:
+                raw = base64.b64decode((data.get("b64") or "").split(",")[-1])
+                import openpyxl
+                wb = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+                parts = []
+                for ws in wb.worksheets:
+                    for row in ws.iter_rows(values_only=True):
+                        for cell in row:
+                            if cell is not None:
+                                parts.append(str(cell))
+                ids = _extract_ids(" ".join(parts))
+            except Exception as e:
+                return self._send(200, {"error": f"Excel oxunmadı: {str(e)[:120]}"})
+            if not ids:
+                return self._send(200, {"error": "Excel-də elan nömrəsi tapılmadı"})
+            threading.Thread(target=_run_bulk, args=(ids,), daemon=True).start()
+            return self._send(200, {"ok": True, "total": len(ids)})
         if path == "/api/draft/update":
             return self._send(200, _DRAFTS.update(int(data.get("id")), data))
         if path == "/api/draft/reject":

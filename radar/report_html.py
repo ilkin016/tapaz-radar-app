@@ -803,12 +803,24 @@ function adminView(){
      <div class="controls" id="a_coderow" style="display:none"><input id="a_code" placeholder="SMS kodu" style="width:140px"><button class="chip on" id="a_verify">✓ Təsdiqlə</button></div>
      <div class="small" id="a_authmsg" style="margin-top:4px"></div>
      <div class="small muted">Kod SƏNİN telefonuna gəlir və SƏN daxil edirsən (təhlükəsizlik).</div></div>`;
- const repost=`<div class="panel"><h2>📥 Köhnə elanı BİZİM sistemə gətir (draft)</h2>
-   <div class="controls"><input id="a_lid" placeholder="Elan nömrəsi (məs 48251733)" style="width:230px">
-    <button class="chip" id="a_preview">👁 Önizləmə</button><button class="chip on" id="a_post">📥 Sistemə gətir</button></div>
-   <div class="small muted">Elan <b>BİZİM sistemə</b> gəlir → AI PCTECH uyğunlaşdırma → yoxlama → <b>təsdiqdən sonra</b> tap.az. tap.az-a birbaşa getmir.</div>
-   <div id="a_result" style="margin-top:10px"></div></div>
-   <div class="panel"><h2>📋 Draftlar <span class="small">— bizim sistem</span></h2><div id="a_drafts" class="muted">Yüklənir…</div></div>`;
+ const repost=`<div class="panel"><h2>📥 Elan gətir — BİZİM sistemə</h2>
+   <div class="controls"><input id="a_lid" placeholder="Tək elan nömrəsi (məs 48251733)" style="width:230px">
+    <button class="chip" id="a_preview">👁 Önizləmə</button><button class="chip on" id="a_post">📥 Gətir</button></div>
+   <div id="a_result" style="margin-top:8px"></div>
+   <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">📚 Toplu əlavə (çoxlu link/kod) + Excel import</summary>
+    <div style="margin-top:8px"><textarea id="a_bulk" placeholder="Bir neçə link və ya kod — hər sətirdə bir, və ya vergüllə&#10;48251733&#10;https://tap.az/elanlar/.../48443132&#10;48123456, 48987654" style="width:100%;min-height:88px;font-family:monospace;font-size:12px"></textarea>
+     <div class="controls" style="margin-top:6px"><button class="chip on" id="a_bulkgo">📥 Hamısını gətir</button>
+      <label class="chip" style="cursor:pointer;margin:0">📊 Excel-dən import<input type="file" id="a_xls" accept=".xlsx" style="display:none"></label></div>
+     <div class="small muted" style="margin-top:4px">Mətndən/linkdən 6–9 rəqəmli nömrələr avtomatik tanınır · təkrarlar və mövcud draftlar ötürülür.</div>
+     <div class="small" id="a_bulkmsg" style="margin-top:6px"></div></div></details>
+   <div class="small muted" style="margin-top:8px">Elan <b>BİZİM sistemə</b> gəlir → AI PCTECH → yoxlama → <b>təsdiqdən sonra</b> tap.az.</div></div>
+   <div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+     <h2 style="margin:0">📋 Draftlar</h2><input id="a_dq" placeholder="🔎 axtar (ad / nömrə)" style="width:200px"></div>
+    <div class="controls" id="a_dfilters" style="margin-top:8px;gap:6px"></div>
+    <div id="a_dbulkbar" style="margin-top:6px;display:none;align-items:center;gap:12px">
+      <label class="small" style="cursor:pointer"><input type="checkbox" id="a_dall"> hamısını seç</label>
+      <button class="chip" id="a_ddel" disabled>🗑 Seçilənləri sil</button><span class="small muted" id="a_dselc"></span></div>
+    <div id="a_drafts" class="muted" style="margin-top:8px">Yüklənir…</div></div>`;
  return _sysHead()+refresh+tlogin+repost;
 }
 // ---- 2) Tənzimləmələr səhifəsi ----
@@ -842,16 +854,46 @@ function bindAdmin(){const g=id=>document.getElementById(id);const J={'Content-T
  if(g('a_logout'))g('a_logout').onclick=async()=>{await api('/api/auth/logout',{method:'POST'});await checkBackend();render();};
  if(g('a_preview'))g('a_preview').onclick=async()=>{const id=g('a_lid').value.trim();if(!id)return;g('a_result').innerHTML='Oxunur…';const r=await api('/api/repost',{method:'POST',headers:J,body:JSON.stringify({listing_id:id,dry_run:true,contact:{}})});if(r.stage==='dry_run'){const a=r.ad;g('a_result').innerHTML=`<div class="panel" style="margin:0"><b>${esc(a.title||'')}</b><div class="small">Kateqoriya: ${esc(a.category_slug)} · Qiymət: ${a.price}₼ · Şəkil: ${a.n_photos} · Atributlar: ${a.properties.collection.length+a.properties.boolean.length}</div></div>`;}else g('a_result').innerHTML='<div class="small">⚠️ '+esc(JSON.stringify(r).slice(0,300))+'</div>';};
  if(g('a_post'))g('a_post').onclick=async()=>{const id=g('a_lid').value.trim();if(!id)return;g('a_result').innerHTML='Sistemə gətirilir (şəkillər endirilir)…';const r=await api('/api/draft/create',{method:'POST',headers:J,body:JSON.stringify({listing_id:id})});if(r.ok){g('a_result').innerHTML='✅ Draft #'+r.draft_id+' BİZİM sistemə gətirildi — aşağıda yoxla';g('a_lid').value='';loadDrafts();}else g('a_result').innerHTML='⚠️ '+esc(JSON.stringify(r).slice(0,220));};
+ if(g('a_bulkgo'))g('a_bulkgo').onclick=async()=>{const t=g('a_bulk').value.trim();if(!t){g('a_bulkmsg').innerHTML='⚠️ Mətn boşdur';return;}g('a_bulkmsg').innerHTML='🔄 Başladılır…';const r=await api('/api/draft/bulk-create',{method:'POST',headers:J,body:JSON.stringify({text:t})});if(r.ok){g('a_bulkmsg').innerHTML='🔄 '+r.total+' nömrə tapıldı — gətirilir…';pollBulk();}else g('a_bulkmsg').innerHTML='⚠️ '+esc(r.error||JSON.stringify(r));};
+ if(g('a_xls'))g('a_xls').onchange=async(e)=>{const f=e.target.files[0];if(!f)return;g('a_bulkmsg').innerHTML='📊 Excel oxunur: '+esc(f.name);const b64=await new Promise(res=>{const rd=new FileReader();rd.onload=()=>res(rd.result);rd.readAsDataURL(f);});const r=await api('/api/draft/import-excel',{method:'POST',headers:J,body:JSON.stringify({b64})});if(r.ok){g('a_bulkmsg').innerHTML='🔄 Excel-də '+r.total+' nömrə — gətirilir…';pollBulk();}else g('a_bulkmsg').innerHTML='⚠️ '+esc(r.error||JSON.stringify(r));e.target.value='';};
+ if(g('a_dq'))g('a_dq').oninput=()=>{DQ=g('a_dq').value;renderDrafts();};
+ (async()=>{const r=await api('/api/draft/bulk-status');if(r&&r.running)pollBulk();})();
  loadDrafts();
 }
-async function loadDrafts(){const el=document.getElementById('a_drafts');if(!el)return;const r=await api('/api/draft/list');const ds=(r.drafts||[]);
- if(!ds.length){el.innerHTML='<span class="muted">Hələ draft yoxdur. Yuxarıdan elan nömrəsi ilə gətir.</span>';return;}
- el.innerHTML=ds.map(d=>`<div class="panel" style="margin:0 0 8px;padding:11px 14px">
-   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
-    <div><b>#${d.id} ${esc(d.title||'')}</b> <span class="small">${d.price||''}₼ · ${esc(d.category_slug||'')} · ${d.n_photos}📷 · <b>${esc(d.status)}</b>${d.tapaz_ad_id?` · tap.az #${esc(d.tapaz_ad_id)} (${esc(d.tapaz_status||'')})`:''}</span></div>
-    <div class="controls" style="margin:0"><button class="chip" data-dv="${d.id}">👁 Bax/Redaktə</button>${d.status==='pending'?`<button class="chip on" data-da="${d.id}">✅ Təsdiqlə → tap.az</button>`:''}<button class="chip" data-dd="${d.id}">🗑</button></div>
+async function pollBulk(){const el=document.getElementById('a_bulkmsg');const r=await api('/api/draft/bulk-status');if(!r||!r.total)return;
+ if(r.running){if(el)el.innerHTML='🔄 '+r.done+'/'+r.total+' — ✅'+r.ok+' yeni · ⏭'+r.skip+' mövcud · ⚠️'+r.fail+' xəta';setTimeout(pollBulk,1500);}
+ else{if(el)el.innerHTML='✅ Bitdi: ✅'+r.ok+' yeni · ⏭'+r.skip+' mövcud'+(r.fail?' · ⚠️'+r.fail+' xəta':'')+((r.errors&&r.errors.length)?' <span class="muted">('+esc(r.errors.slice(0,3).join('; '))+')</span>':'');loadDrafts();}}
+let DRAFTSCACHE=[],DFILTER='all',DQ='';
+function _dstat(d){if(d.status==='posted')return 'posted';if(d.status==='rejected')return 'rejected';if(d.adapted_title||(d.n_ai_photos||0)>0)return 'ai';return 'pending';}
+const _DTAB={all:'Hamısı',pending:'⏳ Gözləyən',ai:'✨ AI hazır',posted:'📤 Göndərilmiş',rejected:'❌ Rədd'};
+function _dbadge(d){const s=_dstat(d);const m={pending:['⏳ gözləyən','var(--chip)','var(--ink)'],ai:['✨ AI hazır','var(--acc-soft)','var(--acc2)'],posted:['📤 tap.az: '+esc(d.tapaz_status||'?'),'rgba(34,197,94,.18)','var(--good)'],rejected:['❌ rədd','rgba(239,68,68,.16)','var(--bad)']}[s];
+ return `<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;background:${m[1]};color:${m[2]}">${m[0]}</span>`;}
+async function loadDrafts(){const el=document.getElementById('a_drafts');if(!el)return;const r=await api('/api/draft/list');DRAFTSCACHE=(r.drafts||[]);renderDrafts();}
+function renderDrafts(){const el=document.getElementById('a_drafts');if(!el)return;
+ const counts={all:DRAFTSCACHE.length};['pending','ai','posted','rejected'].forEach(k=>counts[k]=DRAFTSCACHE.filter(d=>_dstat(d)===k).length);
+ const fb=document.getElementById('a_dfilters');if(fb){fb.innerHTML=Object.keys(_DTAB).map(k=>`<button class="chip${DFILTER===k?' on':''}" data-df="${k}">${_DTAB[k]} <span class="cnt">${counts[k]||0}</span></button>`).join('');
+  fb.querySelectorAll('[data-df]').forEach(b=>b.onclick=()=>{DFILTER=b.dataset.df;renderDrafts();});}
+ let rows=DRAFTSCACHE.filter(d=>DFILTER==='all'||_dstat(d)===DFILTER);
+ const q=DQ.toLowerCase().trim();if(q)rows=rows.filter(d=>(''+d.id).includes(q)||(''+(d.source_id||'')).includes(q)||(d.title||'').toLowerCase().includes(q));
+ const bar=document.getElementById('a_dbulkbar');if(bar)bar.style.display=rows.length?'flex':'none';
+ if(!DRAFTSCACHE.length){el.innerHTML='<span class="muted">Hələ draft yoxdur. Yuxarıdan tək nömrə və ya toplu əlavə et.</span>';return;}
+ if(!rows.length){el.innerHTML='<span class="muted">Bu filtrdə draft yoxdur.</span>';return;}
+ el.innerHTML=rows.map(d=>`<div style="margin:0 0 6px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)">
+   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <div style="display:flex;align-items:center;gap:9px;min-width:0"><input type="checkbox" class="dck" value="${d.id}" style="flex-shrink:0">
+     <div style="min-width:0"><span style="font-weight:700">#${d.id}</span> ${esc((d.title||'').slice(0,58))} ${_dbadge(d)}
+      <div class="small muted">${d.price||0}₼ · ${esc(d.category_slug||'—')} · ${d.n_photos||0}📷${(d.n_ai_photos||0)?' · ✨'+d.n_ai_photos:''}${d.tapaz_ad_id?' · tap.az #'+esc(d.tapaz_ad_id):''}</div></div></div>
+    <div class="controls" style="margin:0;flex-shrink:0"><button class="chip" data-dv="${d.id}">👁</button>${d.status==='pending'?`<button class="chip on" data-da="${d.id}">✅ Təsdiqlə</button>`:''}<button class="chip" data-dd="${d.id}">🗑</button></div>
    </div><div id="dv_${d.id}" style="display:none;margin-top:8px"></div></div>`).join('');
- bindDrafts();
+ bindDrafts();bindDraftSelect();
+}
+function bindDraftSelect(){const cks=[...document.querySelectorAll('.dck')];
+ const upd=()=>{const sel=cks.filter(c=>c.checked);const del=document.getElementById('a_ddel'),c=document.getElementById('a_dselc'),all=document.getElementById('a_dall');
+  if(del)del.disabled=!sel.length;if(c)c.textContent=sel.length?sel.length+' seçilib':'';if(all)all.checked=cks.length>0&&sel.length===cks.length;};
+ cks.forEach(c=>c.onchange=upd);
+ const all=document.getElementById('a_dall');if(all)all.onchange=()=>{cks.forEach(c=>c.checked=all.checked);upd();};
+ const del=document.getElementById('a_ddel');if(del)del.onclick=async()=>{const ids=cks.filter(c=>c.checked).map(c=>+c.value);if(!ids.length||!confirm(ids.length+' draft silinsin?'))return;del.disabled=true;del.textContent='Silinir…';for(const id of ids){await api('/api/draft/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});}loadDrafts();};
+ upd();
 }
 async function loadUsers(){const el=document.getElementById('u_list');if(!el)return;const r=await api('/api/user/list');const us=(r.users||[]);
  el.innerHTML=us.map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)"><span><b>${esc(u.username)}</b> <span class="chip" style="cursor:default;font-size:10px">${esc(u.role)}</span> <span class="small">${esc(u.created_at||'')}</span></span><button class="chip" data-udel="${esc(u.username)}">🗑</button></div>`).join('')||'<span class="muted">yox</span>';
@@ -864,7 +906,7 @@ function bindDrafts(){const g=id=>document.getElementById(id);const J={'Content-
   const aiSection=`<div class="panel" style="margin:10px 0 0;background:var(--acc-soft)"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><b>🤖 PCTECH brend-versiyası</b><button class="chip on" data-aiadapt="${id}">${aiOn?'🔄 Yenidən generasiya':'✨ PCTECH-ə uyğunlaşdır (mətn + şəkil)'}</button></div>
     ${aiOn?`<div class="grid2" style="margin-top:8px"><div><div class="small" style="font-weight:700;color:var(--acc2)">✨ PCTECH başlıq</div><div style="font-weight:700">${esc(d.adapted_title||'—')}</div><div class="small" style="font-weight:700;margin-top:6px;color:var(--acc2)">✨ PCTECH təsvir</div><div class="small" style="white-space:pre-wrap;max-height:140px;overflow:auto">${esc(d.adapted_body||'—')}</div></div>
      <div><div class="small" style="font-weight:700;color:var(--acc2)">✨ AI şəkillər (${d.n_ai_photos||0})</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${(d.ai_photos||[]).map(u=>`<img src="${u}" style="width:82px;height:82px;object-fit:cover;border-radius:8px;border:2px solid var(--acc2)">`).join('')||'<span class="muted">şəkil yox</span>'}</div></div></div>
-     <div class="small muted" style="margin-top:6px">✅ «Təsdiqlə → tap.az» AI-versiyanı (PCTECH mətn + AI şəkil) göndərəcək.</div>`:'<div class="small muted" style="margin-top:6px">Açar lazımdır: OPENAI_API_KEY (config/brand.json və ya env).</div>'}
+     <div class="small muted" style="margin-top:6px">✅ «Təsdiqlə → tap.az» AI-versiyanı (PCTECH mətn + AI şəkil) göndərəcək.</div>`:(BACKEND.ai_key?'<div class="small muted" style="margin-top:6px">✨ düyməsi ilə PCTECH mətn + AI şəkillər yaradılacaq.</div>':'<div class="small" style="margin-top:6px;color:var(--bad)">⚠️ OpenAI açarı yoxdur — <b>⚙️ Tənzimləmələr</b> səhifəsindən əlavə et.</div>')}
     <div id="aimsg_${id}" class="small" style="margin-top:6px"></div></div>`;
   box.innerHTML=orig+aiSection;
   box.querySelector('[data-dsave]').onclick=async()=>{await api('/api/draft/update',{method:'POST',headers:J,body:JSON.stringify({id:+id,title:g('dt_'+id).value,body:g('db_'+id).value,price:parseFloat(g('dp_'+id).value)||0})});loadDrafts();};
