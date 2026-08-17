@@ -773,9 +773,9 @@ function adminView(){
  if(!BACKEND)return `<div class="panel muted" style="line-height:1.7">⚠️ Bu funksiya yalnız <b>Mac-local backend</b> ilə işləyir (Cloudflare VPS-i tap.az-a buraxmır).<br>Terminalda: <code>./run_backend.sh</code> → <b>http://127.0.0.1:8091/</b> (və ya sslip URL).</div>`;
  const su=BACKEND.sys;
  if(!su)return `<div class="panel"><h2>🔐 Sistemə giriş</h2>
-   <div class="controls"><input id="s_user" placeholder="İstifadəçi" style="width:160px"><input id="s_pw" type="password" placeholder="Parol" style="width:160px" onkeydown="if(event.key==='Enter')document.getElementById('s_login').click()"><button class="chip on" id="s_login">Giriş</button></div>
+   <div class="controls"><input id="s_user" value="admin" placeholder="istifadəçi adı" style="width:160px"><input id="s_pw" type="password" placeholder="parol" style="width:160px" onkeydown="if(event.key==='Enter')document.getElementById('s_login').click()"><button class="chip on" id="s_login">Giriş</button></div>
    <div class="small" id="s_msg" style="margin-top:6px"></div>
-   <div class="small muted">İlk admin parolu Mac-də <code>data/first_admin.txt</code> faylındadır.</div></div>`;
+   <div class="small muted">İstifadəçi adı: <b>admin</b> · parol Mac-də <code>data/first_admin.txt</code> faylındadır.<br>⚠️ Bu <b>telefon girişi deyil</b> — telefon+SMS tap.az bölməsi bu girişdən <b>sonra</b> görünür.</div></div>`;
  const isAdmin=su.role==='admin';
  const head=`<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div>👤 <b>${esc(su.username)}</b> <span class="chip" style="cursor:default;background:var(--acc-soft)">${esc(su.role)}</span></div><button class="chip" id="s_logout">Sistemdən çıxış</button></div></div>`;
  const _lasts=META.cats.map(c=>c.last).filter(Boolean).sort();const _newestL=_lasts[_lasts.length-1]||'—';const _rr=BACKEND.refresh&&BACKEND.refresh.running;
