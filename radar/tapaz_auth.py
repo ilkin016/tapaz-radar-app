@@ -74,53 +74,52 @@ class AuthClient:
         except Exception:
             js = raw[:800]
         if self.verbose:
-            print(f"  [{method or 'POST'} {url}] → {code}\n  {json.dumps(js, ensure_ascii=False)[:600] if isinstance(js, (dict, list)) else js}")
+            import re as _re
+            shown = json.dumps(js, ensure_ascii=False)[:600] if isinstance(js, (dict, list)) else str(js)[:600]
+            # token dəyərlərini maskala (struktur/sahə adları görünsün, dəyər yox)
+            shown = _re.sub(r'("(?:accessToken|access_token|token|csrfToken|jwt)"\s*:\s*")[^"]+(")', r'\1***\2', shown)
+            print(f"  [{method or 'POST'} {url}] → {code}\n  {shown}", flush=True)
         return code, js
 
-    # ---- 1) SMS kod göndər ----
+    # ---- 1) SMS kod göndər ----  (canlı test: {phone} işləyir)
     def send_code(self, phone):
-        """POST /auth — telefon nömrəsinə SMS kod göndərir. İlk testdə cavab sxemini göstərir."""
-        phone = phone.strip()
-        # Ən ehtimal sahə adları — ilk canlı testdən sonra dəqiqləşir
-        for payload in ({"phone": phone}, {"phoneNumber": phone}, {"msisdn": phone},
-                        {"phone": phone, "type": "sms"}):
-            code, js = self._req(f"{DIGIT}/auth", payload)
-            if code in (200, 201) and isinstance(js, dict) and not (js.get("error") or js.get("errors")):
-                return {"ok": True, "sent_payload": payload, "resp": js}
-        return {"ok": False, "resp": js, "note": "Sahə adı uyğun gəlmədi — xam cavaba bax"}
+        """POST /auth {phone} → SMS kod."""
+        code, js = self._req(f"{DIGIT}/auth", {"phone": phone.strip()})
+        ok = code in (200, 201) and isinstance(js, dict) and not (js.get("error") or js.get("errors"))
+        left = js.get("code_requests_left") if isinstance(js, dict) else None
+        return {"ok": ok, "code_requests_left": left, "resp": None if ok else js}
 
-    # ---- 2) Kodu təsdiqlə → accessToken ----
+    # ---- 2) Kodu təsdiqlə → access_token ----  (canlı test: {phone,code} → access_token)
     def verify_code(self, phone, code_value):
-        """POST /auth/verify — kodu yoxlayır, accessToken qaytarır."""
-        phone = phone.strip()
-        for payload in ({"phone": phone, "code": code_value}, {"phoneNumber": phone, "code": code_value},
-                        {"phone": phone, "otp": code_value}, {"phone": phone, "smsCode": code_value}):
-            st, js = self._req(f"{DIGIT}/auth/verify", payload)
-            if st in (200, 201) and isinstance(js, dict):
-                tok = js.get("accessToken") or js.get("access_token") or js.get("token") \
-                    or (js.get("data") or {}).get("accessToken")
-                if tok:
-                    self.access_token = tok
-                    return {"ok": True, "accessToken": tok[:12] + "…", "sent_payload": payload}
-        return {"ok": False, "resp": js, "note": "accessToken tapılmadı — xam cavaba bax"}
+        """POST /auth/verify {phone,code} → access_token."""
+        st, js = self._req(f"{DIGIT}/auth/verify", {"phone": phone.strip(), "code": code_value})
+        tok = (js.get("access_token") or js.get("accessToken")) if isinstance(js, dict) else None
+        if tok:
+            self.access_token = tok
+            return {"ok": True}
+        msg = js.get("message") if isinstance(js, dict) else "kod yanlış"
+        return {"ok": False, "note": msg, "resp": js}
 
     # ---- 3) tap.az sessiyası ----
     def login(self, access_token=None):
-        """GraphQL loginUser(accessToken) → sessiya cookie + csrfToken + user."""
+        """GraphQL loginUser(accessToken) → sessiya cookie qurur.
+        ‼️ Canlı test: loginUser IDMutationResultType qaytarır — entity=skalyar ID, csrfToken YOX.
+        User detalları sonra currentUser ilə alınır."""
         tok = access_token or self.access_token
         if not tok:
             return {"ok": False, "note": "accessToken yoxdur"}
-        q = ("mutation($accessToken:String!){ loginUser(accessToken:$accessToken){ "
-             "entity{ id name email phone } csrfToken } }")
+        q = "mutation($accessToken:String!){ loginUser(accessToken:$accessToken){ entity } }"
         st, js = self._req(GRAPHQL, {"query": q, "variables": {"accessToken": tok}},
                            headers={"Referer": "https://tap.az/"})
-        data = (js or {}).get("data", {}).get("loginUser") if isinstance(js, dict) else None
-        if data:
-            self.csrf = data.get("csrfToken")
-            self.user = data.get("entity")
-            self._save()
-            return {"ok": True, "user": self.user, "csrf": bool(self.csrf)}
-        return {"ok": False, "resp": js, "note": "loginUser uğursuz — xam cavaba bax"}
+        if not isinstance(js, dict) or js.get("errors"):
+            return {"ok": False, "resp": js, "note": "loginUser uğursuz"}
+        d = (js.get("data") or {}).get("loginUser")
+        if d is None:
+            return {"ok": False, "resp": js}
+        # sessiya cookie quruldu → user detallarını al
+        self.user = self.whoami() or {"id": (d.get("entity") if isinstance(d, dict) else d)}
+        self._save()
+        return {"ok": True, "user": self.user}
 
     # ---- sessiya saxlama (Keychain) ----
     def _save(self):

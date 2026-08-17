@@ -97,7 +97,9 @@ def _multipart(field, filename, content, mime="image/jpeg"):
 
 
 def reupload_photo(auth, img_bytes, filename="photo.jpg"):
-    """POST /pond (sessiya-cookie) → photoId. auth = AuthClient (opener + csrf)."""
+    """POST /pond (sessiya-cookie) → photoId (yol/path). auth = AuthClient.
+    ‼️ Canlı test: /pond HTML qaytarır (FilePond), JSON yox.
+    photoId = <input name="gallery[photo_ids][]" value="YOL"> dəyəri."""
     body, ctype = _multipart("images[]", filename, img_bytes)
     h = {"Content-Type": ctype, "Origin": "https://tap.az", "Referer": "https://tap.az/",
          "User-Agent": getattr(tap, "UA", "Mozilla/5.0")}
@@ -105,13 +107,9 @@ def reupload_photo(auth, img_bytes, filename="photo.jpg"):
         h["X-CSRF-Token"] = auth.csrf
     req = urllib.request.Request(POND, data=body, headers=h, method="POST")
     with auth.opener.open(req, timeout=60) as r:
-        js = json.loads(r.read().decode("utf-8", "ignore"))
-    # cavab: [{id, thumbnail_url}] və ya {id:...}
-    if isinstance(js, list) and js:
-        return js[0].get("id")
-    if isinstance(js, dict):
-        return js.get("id") or (js.get("data") or {}).get("id")
-    return None
+        html = r.read().decode("utf-8", "ignore")
+    m = re.search(r'name="gallery\[photo_ids\]\[\]"[^>]*value="([^"]+)"', html)
+    return m.group(1) if m else None
 
 
 def reupload_all(auth, photo_urls, limit=10):

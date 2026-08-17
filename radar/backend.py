@@ -25,7 +25,7 @@ PY = os.environ.get("RADAR_PY", "python3")
 from radar import poster
 from radar.tapaz_auth import AuthClient
 
-_AUTH = AuthClient(verbose=False)
+_AUTH = AuthClient(verbose=True)  # digit-u xam cavablarını jurnalla (debug)
 _AUTH.load()  # Keychain-dən mövcud sessiya
 _REFRESH = {"running": False, "started": None, "done": None, "log": "", "code": None}
 
