@@ -6,11 +6,11 @@
 cd "$(dirname "$0")" || exit 1
 PORT="${1:-8091}"
 if [ "$2" = "--tunnel" ]; then
-  # VPS-də localhost:$PORT Mac backend-ə yönəlir; VPS Caddy /api-ni ora proxy edir (SETUP.md-yə bax)
-  ssh -i "$HOME/.ssh/tapaz_radar_deploy" -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 \
-      -N -R "${PORT}:localhost:${PORT}" root@187.127.91.112 &
+  # VPS-də 0.0.0.0:$PORT (public, GatewayPorts clientspecified) → Mac backend. sslip.io URL:
+  ssh -i "$HOME/.ssh/tapaz_radar_deploy" -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes \
+      -N -R "0.0.0.0:${PORT}:localhost:${PORT}" root@187.127.91.112 &
   TUN=$!
-  echo "↔ reverse tunnel: VPS:${PORT} → Mac:${PORT} (pid $TUN)"
+  echo "↔ reverse tunnel: http://187.127.91.112.sslip.io:${PORT}/  → Mac:${PORT} (pid $TUN)"
   trap "kill $TUN 2>/dev/null" EXIT
 fi
 echo "▶ Mac-local backend → http://127.0.0.1:${PORT}/"
