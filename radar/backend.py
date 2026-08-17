@@ -150,6 +150,21 @@ class H(BaseHTTPRequestHandler):
             _DRAFTS.set_status(int(data.get("id")), "rejected"); return self._send(200, {"ok": True})
         if path == "/api/draft/delete":
             _DRAFTS.delete(int(data.get("id"))); return self._send(200, {"ok": True})
+        if path == "/api/draft/ai-adapt":  # PCTECH brend-uyğunlaşdırma (mətn + şəkil)
+            did = int(data.get("id"))
+            d = _DRAFTS.get(did)
+            if not d:
+                return self._send(404, {"error": "draft yoxdur"})
+            from radar import ai_brand
+            txt = ai_brand.adapt_text(d["title"], d["body"])
+            if txt.get("error"):
+                return self._send(200, {"stage": "text", "error": txt["error"]})
+            imgs = ai_brand.generate_images(txt["title"], txt["body"])
+            if isinstance(imgs, dict) and imgs.get("error"):
+                _DRAFTS.save_adapted(did, txt["title"], txt["body"], [])  # mətn saxla
+                return self._send(200, {"ok": True, "text_done": True, "image_error": imgs["error"]})
+            _DRAFTS.save_adapted(did, txt["title"], txt["body"], imgs)
+            return self._send(200, {"ok": True, "adapted_title": txt["title"], "n_ai_photos": len(imgs)})
         if path == "/api/draft/approve":  # BİZİM təsdiq → İNDİ tap.az-a göndər (createAd)
             if not _AUTH.user:
                 return self._send(401, {"error": "login lazımdır"})
@@ -159,9 +174,13 @@ class H(BaseHTTPRequestHandler):
             d = _DRAFTS.get(did)
             if not d:
                 return self._send(404, {"error": "draft yoxdur"})
+            use_ai = (d.get("n_ai_photos") or 0) > 0  # AI şəkillər varsa onları, yoxsa orijinalı
+            title = d.get("adapted_title") or d["title"]
+            body = d.get("adapted_body") or d["body"]
             photo_ids = []
-            for i in range(d.get("n_photos") or 0):
-                b = _DRAFTS.photo_bytes(did, i)
+            n = (d.get("n_ai_photos") or 0) if use_ai else (d.get("n_photos") or 0)
+            for i in range(n):
+                b = _DRAFTS.ai_photo_bytes(did, i) if use_ai else _DRAFTS.photo_bytes(did, i)
                 if b:
                     try:
                         pid = poster.reupload_photo(_AUTH, b, f"{i}.jpg")
@@ -171,8 +190,8 @@ class H(BaseHTTPRequestHandler):
                         pass
             contact = {"name": _AUTH.user.get("name"), "email": _AUTH.user.get("email"),
                        "phone": _AUTH.user.get("phone")}
-            ad_data = {"categoryId": d["category_id"], "title": d["title"], "body": d["body"],
-                       "price": d["price"], "properties": d["properties"], "n_photos": d["n_photos"]}
+            ad_data = {"categoryId": d["category_id"], "title": title, "body": body,
+                       "price": d["price"], "properties": d["properties"], "n_photos": len(photo_ids)}
             params = poster.build_create_ad_params(ad_data, photo_ids, contact)
             res = poster.create_draft(_AUTH, params)
             if not res.get("ok"):

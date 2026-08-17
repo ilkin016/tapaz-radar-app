@@ -30,7 +30,28 @@ class DraftStore:
         self.db = sqlite3.connect(DB, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.execute(_SCHEMA)
+        # migration — AI brend-uyğunlaşdırma sahələri
+        for col, typ in [("adapted_title", "TEXT"), ("adapted_body", "TEXT"),
+                         ("n_ai_photos", "INTEGER DEFAULT 0"), ("ai_status", "TEXT")]:
+            try:
+                self.db.execute(f"ALTER TABLE drafts ADD COLUMN {col} {typ}")
+            except sqlite3.OperationalError:
+                pass
         self.db.commit()
+
+    def save_adapted(self, did, title, body, ai_image_bytes_list):
+        """AI-uyğunlaşdırılmış mətn + PCTECH şəkilləri saxla (ai_<i>.jpg)."""
+        d = os.path.join(MEDIA, str(did)); os.makedirs(d, exist_ok=True)
+        for i, b in enumerate(ai_image_bytes_list or []):
+            if isinstance(b, (bytes, bytearray)):
+                open(os.path.join(d, f"ai_{i}.jpg"), "wb").write(b)
+        self.db.execute("UPDATE drafts SET adapted_title=?, adapted_body=?, n_ai_photos=?, ai_status='done' WHERE id=?",
+                        (title, body, len(ai_image_bytes_list or []), did))
+        self.db.commit()
+
+    def ai_photo_bytes(self, did, i):
+        p = os.path.join(MEDIA, str(did), f"ai_{i}.jpg")
+        return open(p, "rb").read() if os.path.exists(p) else None
 
     def create(self, source_id, data, image_bytes_list):
         """Draft yarat (pending) + şəkilləri lokal saxla. tap.az-a HEÇ NƏ getmir."""
@@ -64,6 +85,7 @@ class DraftStore:
         d = dict(r)
         d["properties"] = json.loads(d.get("properties") or "{}")
         d["photos"] = [f"/drafts_media/{did}/{i}.jpg" for i in range(d.get("n_photos") or 0)]
+        d["ai_photos"] = [f"/drafts_media/{did}/ai_{i}.jpg" for i in range(d.get("n_ai_photos") or 0)]
         return d
 
     def photo_bytes(self, did, i):
