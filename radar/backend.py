@@ -305,6 +305,20 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"ok": True, "text_done": True, "n_ai_photos": len(got), "image_error": imgs["error"]})
             _DRAFTS.save_adapted(did, txt["title"], txt["body"], imgs)
             return self._send(200, {"ok": True, "adapted_title": txt["title"], "n_ai_photos": len(imgs)})
+        if path == "/api/draft/rebrand-one":  # tək brendlənmiş şəkli yenidən yarat (mənbə foto[index]-dən)
+            did = int(data.get("id")); idx = int(data.get("index", 0))
+            d = _DRAFTS.get(did)
+            if not d:
+                return self._send(404, {"error": "draft yoxdur"})
+            src = _DRAFTS.photo_bytes(did, idx)
+            if not src:
+                return self._send(200, {"error": f"#{idx} mənbə şəkli yoxdur"})
+            from radar import ai_brand
+            r = ai_brand.brandify_image(src)
+            if isinstance(r, dict) and r.get("error"):
+                return self._send(200, {"error": r["error"]})
+            _DRAFTS.save_ai_photo(did, idx, r)
+            return self._send(200, {"ok": True, "index": idx})
         if path == "/api/draft/approve":  # BİZİM təsdiq → İNDİ tap.az-a göndər (createAd)
             if not _AUTH.user:
                 return self._send(401, {"error": "login lazımdır"})

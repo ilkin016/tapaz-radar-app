@@ -53,6 +53,12 @@ class DraftStore:
         p = os.path.join(MEDIA, str(did), f"ai_{i}.jpg")
         return open(p, "rb").read() if os.path.exists(p) else None
 
+    def save_ai_photo(self, did, i, data):
+        """Tək brendlənmiş şəkli (ai_<i>.jpg) yenisi ilə əvəz et."""
+        d = os.path.join(MEDIA, str(did)); os.makedirs(d, exist_ok=True)
+        open(os.path.join(d, f"ai_{i}.jpg"), "wb").write(data)
+        return True
+
     def create(self, source_id, data, image_bytes_list):
         """Draft yarat (pending) + şəkilləri lokal saxla. tap.az-a HEÇ NƏ getmir."""
         cur = self.db.execute(
