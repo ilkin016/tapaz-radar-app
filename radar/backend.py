@@ -291,10 +291,18 @@ class H(BaseHTTPRequestHandler):
             txt = ai_brand.adapt_text(d["title"], d["body"])
             if txt.get("error"):
                 return self._send(200, {"stage": "text", "error": txt["error"]})
-            imgs = ai_brand.generate_images(txt["title"], txt["body"])
+            # real tap.az şəkillərini götür → PCTECH brendinə ÇEVİR (məhsul eyni qalır, yalnız fon/təqdimat).
+            # Şəkil yoxdursa yalnız onda sıfırdan generasiya (fallback).
+            src_photos = []
+            for i in range(d.get("n_photos") or 0):
+                pb = _DRAFTS.photo_bytes(did, i)
+                if pb:
+                    src_photos.append(pb)
+            imgs = ai_brand.brandify_images(src_photos) if src_photos else ai_brand.generate_images(txt["title"], txt["body"])
             if isinstance(imgs, dict) and imgs.get("error"):
-                _DRAFTS.save_adapted(did, txt["title"], txt["body"], [])  # mətn saxla
-                return self._send(200, {"ok": True, "text_done": True, "image_error": imgs["error"]})
+                got = imgs.get("got") or []
+                _DRAFTS.save_adapted(did, txt["title"], txt["body"], got)  # mətn + alınan şəkillər saxla
+                return self._send(200, {"ok": True, "text_done": True, "n_ai_photos": len(got), "image_error": imgs["error"]})
             _DRAFTS.save_adapted(did, txt["title"], txt["body"], imgs)
             return self._send(200, {"ok": True, "adapted_title": txt["title"], "n_ai_photos": len(imgs)})
         if path == "/api/draft/approve":  # BİZİM təsdiq → İNDİ tap.az-a göndər (createAd)
