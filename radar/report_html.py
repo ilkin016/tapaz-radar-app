@@ -772,12 +772,13 @@ function adminView(){
      <div class="controls" id="a_coderow" style="display:none"><input id="a_code" placeholder="SMS kodu" style="width:140px"><button class="chip on" id="a_verify">✓ Təsdiqlə</button></div>
      <div class="small" id="a_authmsg" style="margin-top:4px"></div>
      <div class="small muted">Kod SƏNİN telefonuna gəlir və SƏN daxil edirsən (təhlükəsizlik — mən OTP-yə toxunmuram).</div></div>`;
- const repost=`<div class="panel"><h2>📤 Köhnə elanı DRAFT kimi yenidən yerləşdir</h2>
+ const repost=`<div class="panel"><h2>📥 Köhnə elanı BİZİM sistemə gətir (draft)</h2>
    <div class="controls"><input id="a_lid" placeholder="Elan nömrəsi (məs 48251733)" style="width:230px">
     <button class="chip" id="a_preview">👁 Önizləmə</button>
-    <button class="chip on" id="a_post" ${li?'':'disabled title="əvvəl login"'}>📤 Draft yarat</button></div>
-   <div class="small muted">Draft moderasiyaya düşür (dərhal canlı olmur); modul təsdiq statusunu izləyir → operator yayımlayır.</div>
-   <div id="a_result" style="margin-top:10px"></div></div>`;
+    <button class="chip on" id="a_post">📥 Sistemə gətir</button></div>
+   <div class="small muted">Elan <b>BİZİM sistemə</b> (draft) gəlir — mətn/şəkil BURADA yoxlanılır. <b>tap.az-a heç nə getmir.</b> Yalnız burada təsdiqdən sonra tap.az moderasiyasına göndərilir.</div>
+   <div id="a_result" style="margin-top:10px"></div></div>
+   <div class="panel"><h2>📋 Draftlar <span class="small">— bizim sistemdə yoxlama</span></h2><div id="a_drafts" class="muted">Yüklənir…</div></div>`;
  return login+repost;
 }
 function bindAdmin(){const g=id=>document.getElementById(id);const J={'Content-Type':'application/json'};
@@ -785,7 +786,25 @@ function bindAdmin(){const g=id=>document.getElementById(id);const J={'Content-T
  if(g('a_verify'))g('a_verify').onclick=async()=>{g('a_authmsg').textContent='Yoxlanılır…';const r=await api('/api/auth/verify',{method:'POST',headers:J,body:JSON.stringify({phone:g('a_phone').value.trim(),code:g('a_code').value.trim()})});if(r.ok&&r.login&&r.login.ok){await checkBackend();render();}else g('a_authmsg').innerHTML='⚠️ '+esc(JSON.stringify(r).slice(0,220));};
  if(g('a_logout'))g('a_logout').onclick=async()=>{await api('/api/auth/logout',{method:'POST'});await checkBackend();render();};
  if(g('a_preview'))g('a_preview').onclick=async()=>{const id=g('a_lid').value.trim();if(!id)return;g('a_result').innerHTML='Oxunur…';const r=await api('/api/repost',{method:'POST',headers:J,body:JSON.stringify({listing_id:id,dry_run:true,contact:{}})});if(r.stage==='dry_run'){const a=r.ad;g('a_result').innerHTML=`<div class="panel" style="margin:0"><b>${esc(a.title||'')}</b><div class="small">Kateqoriya: ${esc(a.category_slug)} · Qiymət: ${a.price}₼ · Şəkil: ${a.n_photos} · Atributlar: ${a.properties.collection.length+a.properties.boolean.length}</div></div>`;}else g('a_result').innerHTML='<div class="small">⚠️ '+esc(JSON.stringify(r).slice(0,300))+'</div>';};
- if(g('a_post'))g('a_post').onclick=async()=>{const id=g('a_lid').value.trim();if(!id)return;if(!confirm('Bu elanı DRAFT kimi öz hesabına yerləşdirim? (moderasiyaya düşəcək)'))return;g('a_result').innerHTML='Yerləşdirilir (şəkillər yüklənir)…';const r=await api('/api/repost',{method:'POST',headers:J,body:JSON.stringify({listing_id:id,contact:{}})});g('a_result').innerHTML=r.stage==='done'?`<div class="panel" style="margin:0"><b>✅ Draft yaradıldı (moderasiyada)</b><div class="small">Status: ${esc((r.status||{}).label||'')} · Yeni elan #${esc((r.created||{}).legacyId||'')}</div></div>`:`<div class="small">⚠️ ${esc(JSON.stringify(r).slice(0,320))}</div>`;};
+ if(g('a_post'))g('a_post').onclick=async()=>{const id=g('a_lid').value.trim();if(!id)return;g('a_result').innerHTML='Sistemə gətirilir (şəkillər endirilir)…';const r=await api('/api/draft/create',{method:'POST',headers:J,body:JSON.stringify({listing_id:id})});if(r.ok){g('a_result').innerHTML='✅ Draft #'+r.draft_id+' BİZİM sistemə gətirildi — aşağıda yoxla';g('a_lid').value='';loadDrafts();}else g('a_result').innerHTML='⚠️ '+esc(JSON.stringify(r).slice(0,220));};
+ loadDrafts();
+}
+async function loadDrafts(){const el=document.getElementById('a_drafts');if(!el)return;const r=await api('/api/draft/list');const ds=(r.drafts||[]);
+ if(!ds.length){el.innerHTML='<span class="muted">Hələ draft yoxdur. Yuxarıdan elan nömrəsi ilə gətir.</span>';return;}
+ el.innerHTML=ds.map(d=>`<div class="panel" style="margin:0 0 8px;padding:11px 14px">
+   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+    <div><b>#${d.id} ${esc(d.title||'')}</b> <span class="small">${d.price||''}₼ · ${esc(d.category_slug||'')} · ${d.n_photos}📷 · <b>${esc(d.status)}</b>${d.tapaz_ad_id?` · tap.az #${esc(d.tapaz_ad_id)} (${esc(d.tapaz_status||'')})`:''}</span></div>
+    <div class="controls" style="margin:0"><button class="chip" data-dv="${d.id}">👁 Bax/Redaktə</button>${d.status==='pending'?`<button class="chip on" data-da="${d.id}">✅ Təsdiqlə → tap.az</button>`:''}<button class="chip" data-dd="${d.id}">🗑</button></div>
+   </div><div id="dv_${d.id}" style="display:none;margin-top:8px"></div></div>`).join('');
+ bindDrafts();
+}
+function bindDrafts(){const g=id=>document.getElementById(id);const J={'Content-Type':'application/json'};
+ document.querySelectorAll('[data-dv]').forEach(b=>b.onclick=async()=>{const id=b.dataset.dv,box=g('dv_'+id);if(box.style.display==='block'){box.style.display='none';return;}const d=await api('/api/draft/get?id='+id);box.style.display='block';
+  box.innerHTML=`<div class="grid2"><div><div class="small" style="font-weight:700">Başlıq</div><input value="${esc(d.title||'')}" id="dt_${id}" style="width:100%"><div class="small" style="font-weight:700;margin-top:6px">Təsvir</div><textarea id="db_${id}" style="width:100%;min-height:90px">${esc(d.body||'')}</textarea><div style="margin-top:6px"><span class="small" style="font-weight:700">Qiymət </span><input value="${d.price||''}" id="dp_${id}" style="width:110px"> <button class="chip on" data-dsave="${id}">💾 Yadda saxla</button></div><div class="small muted" style="margin-top:6px">Atributlar: ${(d.properties.collection||[]).map(c=>esc(c.text||c.value)).join(', ')||'—'}</div></div>
+   <div><div class="small" style="font-weight:700">Şəkillər (${d.n_photos})</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${(d.photos||[]).map(u=>`<img src="${u}" style="width:92px;height:92px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">`).join('')||'<span class="muted">şəkil yox</span>'}</div></div></div>`;
+  box.querySelector('[data-dsave]').onclick=async()=>{await api('/api/draft/update',{method:'POST',headers:J,body:JSON.stringify({id:+id,title:g('dt_'+id).value,body:g('db_'+id).value,price:parseFloat(g('dp_'+id).value)||0})});loadDrafts();};});
+ document.querySelectorAll('[data-da]').forEach(b=>b.onclick=async()=>{if(!confirm('Bu draft-ı yoxladın? tap.az moderasiyasına göndərilsin?'))return;b.textContent='Göndərilir…';b.disabled=true;const r=await api('/api/draft/approve',{method:'POST',headers:J,body:JSON.stringify({id:+b.dataset.da})});alert(r.ok?('✅ tap.az-a göndərildi · status: '+((r.status||{}).label||'')):('⚠️ '+JSON.stringify(r).slice(0,240)));loadDrafts();});
+ document.querySelectorAll('[data-dd]').forEach(b=>b.onclick=async()=>{if(!confirm('Draft silinsin?'))return;await api('/api/draft/delete',{method:'POST',headers:J,body:JSON.stringify({id:+b.dataset.dd})});loadDrafts();});
 }
 // Auto-refresh on entry (stale olduqda)
 function banner(html){let b=document.getElementById('refbanner');if(!b){b=document.createElement('div');b.id='refbanner';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99;background:var(--acc2);color:#fff;padding:8px 16px;font-size:13px;text-align:center;box-shadow:var(--shadow)';document.body.appendChild(b);}b.innerHTML=html;b.style.display=html?'block':'none';}

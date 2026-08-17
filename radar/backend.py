@@ -24,9 +24,11 @@ PY = os.environ.get("RADAR_PY", "python3")
 # --- lazy imports (auth/poster yalnız lazım olanda) ---
 from radar import poster
 from radar.tapaz_auth import AuthClient
+from radar.drafts import DraftStore, MEDIA as DRAFT_MEDIA
 
 _AUTH = AuthClient(verbose=True)  # digit-u xam cavablarını jurnalla (debug)
 _AUTH.load()  # Keychain-dən mövcud sessiya
+_DRAFTS = DraftStore()  # BİZİM sistemin daxili qaralama qatı
 _REFRESH = {"running": False, "started": None, "done": None, "log": "", "code": None}
 
 
@@ -88,6 +90,17 @@ class H(BaseHTTPRequestHandler):
             if not _AUTH.user:
                 return self._send(401, {"error": "login lazımdır"})
             return self._send(200, poster.check_status(_AUTH, q.get("legacy_id") or q.get("ad_gid")))
+        if path == "/api/draft/list":
+            return self._send(200, {"drafts": _DRAFTS.list(q.get("status"))})
+        if path == "/api/draft/get":
+            d = _DRAFTS.get(int(q.get("id", 0)))
+            return self._send(200, d) if d else self._send(404, {"error": "draft yoxdur"})
+        if path.startswith("/drafts_media/"):
+            rel = path[len("/drafts_media/"):]
+            f = os.path.normpath(os.path.join(DRAFT_MEDIA, rel))
+            if f.startswith(DRAFT_MEDIA) and os.path.exists(f):
+                return self._send(200, open(f, "rb").read(), "image/jpeg")
+            return self._send(404, {"error": "şəkil yoxdur"})
         return self._send(404, {"error": "yol yoxdur"})
 
     def do_POST(self):
@@ -112,18 +125,61 @@ class H(BaseHTTPRequestHandler):
             from radar.tapaz_auth import _kc_del
             _kc_del(); _AUTH.user = None; _AUTH.csrf = None
             return self._send(200, {"ok": True})
-        if path == "/api/repost":
+        if path == "/api/repost":  # yalnız ÖNİZLƏMƏ (dry-run) — tap.az-a heç nə getmir
             if _REFRESH["running"]:
-                return self._send(200, {"stage": "busy", "error": "Skan gedir — bitəndən sonra cəhd et (tap.az throttle)"})
-            if not _AUTH.user and not data.get("dry_run"):
+                return self._send(200, {"stage": "busy", "error": "Skan gedir — bitəndən sonra"})
+            return self._send(200, poster.repost(_AUTH, data.get("listing_id"), {}, dry_run=True))
+        # --- Draftlar (BİZİM sistem) ---
+        if path == "/api/draft/create":  # köhnə elanı BİZİM sistemə saxla (tap.az-a YOX)
+            if _REFRESH["running"]:
+                return self._send(200, {"error": "Skan gedir — bitəndən sonra"})
+            ad = poster.read_ad_for_repost(data.get("listing_id"))
+            if ad.get("error"):
+                return self._send(200, {"error": ad["error"]})
+            imgs = []
+            for u in ad.get("photos", []):
+                try:
+                    imgs.append(poster.download_photo(u))
+                except Exception:
+                    pass
+            did = _DRAFTS.create(data.get("listing_id"), ad, imgs)
+            return self._send(200, {"ok": True, "draft_id": did})
+        if path == "/api/draft/update":
+            return self._send(200, _DRAFTS.update(int(data.get("id")), data))
+        if path == "/api/draft/reject":
+            _DRAFTS.set_status(int(data.get("id")), "rejected"); return self._send(200, {"ok": True})
+        if path == "/api/draft/delete":
+            _DRAFTS.delete(int(data.get("id"))); return self._send(200, {"ok": True})
+        if path == "/api/draft/approve":  # BİZİM təsdiq → İNDİ tap.az-a göndər (createAd)
+            if not _AUTH.user:
                 return self._send(401, {"error": "login lazımdır"})
-            contact = dict(data.get("contact") or {})
-            if _AUTH.user:  # kontaktı sessiya istifadəçisindən doldur (öz elanı)
-                contact.setdefault("name", _AUTH.user.get("name") or "")
-                contact.setdefault("email", _AUTH.user.get("email") or "")
-                contact.setdefault("phone", _AUTH.user.get("phone") or "")
-            return self._send(200, poster.repost(_AUTH, data.get("listing_id"),
-                                                 contact, dry_run=data.get("dry_run", False)))
+            if _REFRESH["running"]:
+                return self._send(200, {"error": "Skan gedir — bitəndən sonra"})
+            did = int(data.get("id"))
+            d = _DRAFTS.get(did)
+            if not d:
+                return self._send(404, {"error": "draft yoxdur"})
+            photo_ids = []
+            for i in range(d.get("n_photos") or 0):
+                b = _DRAFTS.photo_bytes(did, i)
+                if b:
+                    try:
+                        pid = poster.reupload_photo(_AUTH, b, f"{i}.jpg")
+                        if pid:
+                            photo_ids.append(pid)
+                    except Exception:
+                        pass
+            contact = {"name": _AUTH.user.get("name"), "email": _AUTH.user.get("email"),
+                       "phone": _AUTH.user.get("phone")}
+            ad_data = {"categoryId": d["category_id"], "title": d["title"], "body": d["body"],
+                       "price": d["price"], "properties": d["properties"], "n_photos": d["n_photos"]}
+            params = poster.build_create_ad_params(ad_data, photo_ids, contact)
+            res = poster.create_draft(_AUTH, params)
+            if not res.get("ok"):
+                return self._send(200, {"stage": "createAd", "result": res})
+            status = poster.check_status(_AUTH, res.get("legacyId"))
+            _DRAFTS.set_status(did, "posted", res.get("legacyId"), (status or {}).get("status"))
+            return self._send(200, {"ok": True, "created": res, "status": status})
         return self._send(404, {"error": "yol yoxdur"})
 
 
