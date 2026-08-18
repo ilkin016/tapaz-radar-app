@@ -165,20 +165,22 @@ def brandify_image(src_bytes, brand=None):
 
 
 _WHITE_PROMPT = (
-    "Isolate the exact product from this photo and place it centred on a pure solid white (#FFFFFF) "
-    "background. Keep the product IDENTICAL — same model, colour, angle and details. Remove ALL original "
-    "background, any text, watermarks, price/credit badges, cards, banners or seller logos. Add only a soft "
-    "realistic contact shadow. Clean professional e-commerce cut-out.")
+    "Place the exact product from this photo, WHOLE and complete, centred on a pure solid white (#FFFFFF) "
+    "background. The ENTIRE product must be fully visible with comfortable empty margin on all sides — "
+    "do NOT crop, cut off, or zoom into any part of the product; nothing may touch the image edges. "
+    "Keep the product IDENTICAL — same model, colour, angle and details. Remove ALL original background, "
+    "text, watermarks, price/credit badges, cards, banners or seller logos. Only a soft realistic contact "
+    "shadow. Clean professional e-commerce cut-out.")
 
 
 def product_white(src_bytes, brand=None):
-    """Real məhsul şəklini → təmiz AĞ fonda (kart montajı üçün). bytes və ya {error}."""
+    """Real məhsul şəklini → təmiz AĞ fonda, TAM görünən (kəsilmədən). bytes və ya {error}."""
     if not has_key():
         return {"error": "OPENAI_API_KEY yoxdur"}
     b = brand or load_brand()
     st, js = _post_multipart("/images/edits", {
         "model": b.get("image_model", "gpt-image-1"), "prompt": _WHITE_PROMPT,
-        "size": b.get("image_size", "1024x1024"), "n": "1"},
+        "size": "auto", "n": "1"},
         [("image", "product.png", src_bytes, "image/jpeg")])
     if st != 200:
         return {"error": f"OpenAI edit {st}: {json.dumps(js)[:200]}"}
