@@ -324,7 +324,8 @@ class H(BaseHTTPRequestHandler):
                 fields = {"title": d.get("adapted_title") or d["title"], "model": "", "features": []}
             try:
                 img = card.build_card(white, fields["title"], fields.get("model", ""),
-                                      fields.get("features", []), ai_brand.load_brand())
+                                      fields.get("features", []), ai_brand.load_brand(),
+                                      category=fields.get("category", ""))
             except Exception as e:
                 return self._send(200, {"error": f"kart montajı: {str(e)[:120]}"})
             _DRAFTS.save_ai_photo(did, idx, img)
@@ -345,6 +346,17 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"error": "şəkil çox böyükdür (15 MB limit)"})
             if idx < 0:
                 idx = d.get("n_ai_photos") or 0  # -1 → sona əlavə et
+            # istifadəçi şəkli də YENİ DİZAYNA (Techbar kart) salınır — data.raw=true olsa xam saxlanır
+            if not data.get("raw"):
+                try:
+                    from radar import ai_brand, card
+                    fields = ai_brand.card_fields(d.get("adapted_title") or d["title"], d.get("adapted_body") or d["body"])
+                    if isinstance(fields, dict) and fields.get("error"):
+                        fields = {"title": d.get("adapted_title") or d["title"], "model": "", "features": [], "category": ""}
+                    raw = card.build_card(raw, fields["title"], fields.get("model", ""), fields.get("features", []),
+                                          ai_brand.load_brand(), category=fields.get("category", ""))
+                except Exception:
+                    pass  # montaj alınmasa xam saxla
             _DRAFTS.save_ai_photo(did, idx, raw)
             return self._send(200, {"ok": True, "index": idx})
         if path == "/api/draft/approve":  # BİZİM təsdiq → İNDİ tap.az-a göndər (createAd)

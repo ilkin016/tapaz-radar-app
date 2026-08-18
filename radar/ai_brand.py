@@ -165,32 +165,34 @@ def brandify_image(src_bytes, brand=None):
 
 
 _WHITE_PROMPT = (
-    "Place the exact product from this photo, WHOLE and complete, centred on a pure solid white (#FFFFFF) "
-    "background. The ENTIRE product must be fully visible with comfortable empty margin on all sides — "
+    "Cut out the exact product from this photo, WHOLE and complete, on a fully TRANSPARENT background. "
+    "The ENTIRE product must be fully visible with comfortable empty margin on all sides — "
     "do NOT crop, cut off, or zoom into any part of the product; nothing may touch the image edges. "
     "Keep the product IDENTICAL — same model, colour, angle and details. Remove ALL original background, "
-    "text, watermarks, price/credit badges, cards, banners or seller logos. Only a soft realistic contact "
-    "shadow. Clean professional e-commerce cut-out.")
+    "text, watermarks, price/credit badges, cards, banners or seller logos. Clean professional isolated "
+    "product cut-out with a subtle soft shadow.")
 
 
 def product_white(src_bytes, brand=None):
-    """Real məhsul şəklini → təmiz AĞ fonda, TAM görünən (kəsilmədən). bytes və ya {error}."""
+    """Real məhsul şəklini → ŞƏFFAF fonda təmiz kəsim, TAM görünən (kart montajı üçün). bytes və ya {error}."""
     if not has_key():
         return {"error": "OPENAI_API_KEY yoxdur"}
     b = brand or load_brand()
-    st, js = _post_multipart("/images/edits", {
-        "model": b.get("image_model", "gpt-image-1"), "prompt": _WHITE_PROMPT,
-        "size": "auto", "n": "1"},
-        [("image", "product.png", src_bytes, "image/jpeg")])
-    if st != 200:
-        return {"error": f"OpenAI edit {st}: {json.dumps(js)[:200]}"}
-    d = js.get("data", [{}])[0]
-    if d.get("b64_json"):
-        return base64.b64decode(d["b64_json"])
-    if d.get("url"):
-        with urllib.request.urlopen(d["url"], timeout=60, context=_CTX) as r:
-            return r.read()
-    return {"error": "boş cavab"}
+    last = "boş cavab"
+    for _ in range(3):  # safety-system ötəri 400 rəddinə qarşı təkrar
+        st, js = _post_multipart("/images/edits", {
+            "model": b.get("image_model", "gpt-image-1"), "prompt": _WHITE_PROMPT,
+            "size": "auto", "n": "1", "background": "transparent"},
+            [("image", "product.png", src_bytes, "image/jpeg")])
+        if st == 200:
+            d = js.get("data", [{}])[0]
+            if d.get("b64_json"):
+                return base64.b64decode(d["b64_json"])
+            if d.get("url"):
+                with urllib.request.urlopen(d["url"], timeout=60, context=_CTX) as r:
+                    return r.read()
+        last = f"OpenAI edit {st}: {json.dumps(js)[:180]}"
+    return {"error": last}
 
 
 def card_fields(title, body, brand=None):
@@ -201,7 +203,8 @@ def card_fields(title, body, brand=None):
     sysmsg = (f"Sən {b['name']} üçün məhsul kartı məlumatı hazırlayırsan. Yalnız verilən mətndəki "
               f"FAKTLARdan istifadə et — heç nə uydurma.")
     user = (f"Məhsul başlığı:\n{title}\n\nTəsvir:\n{body}\n\n"
-            'JSON qaytar (başqa heç nə): {"title":"qısa məhsul adı, marka+seriya, max 4 söz", '
+            'JSON qaytar (başqa heç nə): {"category":"məhsul növü, max 2 söz, Azərbaycanca (məs Gaming noutbuk, Ofis noutbuk, Videokart, Prosessor, Monitor)", '
+            '"title":"qısa məhsul adı, marka+seriya, max 4 söz", '
             '"model":"model kodu — varsa; yoxsa boş sətir", '
             '"features":["3 qısa xüsusiyyət, hər biri max 3 söz, Azərbaycanca"]}. '
             'Nümunə features: ["16\\" ekran","Gaming performansı","RTX 4070"].')
@@ -213,8 +216,8 @@ def card_fields(title, body, brand=None):
         return {"error": f"OpenAI text {st}: {json.dumps(js)[:150]}"}
     try:
         o = json.loads(js["choices"][0]["message"]["content"])
-        return {"title": (o.get("title") or title)[:40], "model": (o.get("model") or "")[:30],
-                "features": [str(f) for f in (o.get("features") or [])][:3]}
+        return {"category": (o.get("category") or "")[:24], "title": (o.get("title") or title)[:40],
+                "model": (o.get("model") or "")[:30], "features": [str(f) for f in (o.get("features") or [])][:3]}
     except Exception as e:
         return {"error": f"parse: {e}"}
 
