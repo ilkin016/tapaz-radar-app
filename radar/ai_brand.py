@@ -164,6 +164,59 @@ def brandify_image(src_bytes, brand=None):
     return {"error": "boş cavab"}
 
 
+_WHITE_PROMPT = (
+    "Isolate the exact product from this photo and place it centred on a pure solid white (#FFFFFF) "
+    "background. Keep the product IDENTICAL — same model, colour, angle and details. Remove ALL original "
+    "background, any text, watermarks, price/credit badges, cards, banners or seller logos. Add only a soft "
+    "realistic contact shadow. Clean professional e-commerce cut-out.")
+
+
+def product_white(src_bytes, brand=None):
+    """Real məhsul şəklini → təmiz AĞ fonda (kart montajı üçün). bytes və ya {error}."""
+    if not has_key():
+        return {"error": "OPENAI_API_KEY yoxdur"}
+    b = brand or load_brand()
+    st, js = _post_multipart("/images/edits", {
+        "model": b.get("image_model", "gpt-image-1"), "prompt": _WHITE_PROMPT,
+        "size": b.get("image_size", "1024x1024"), "n": "1"},
+        [("image", "product.png", src_bytes, "image/jpeg")])
+    if st != 200:
+        return {"error": f"OpenAI edit {st}: {json.dumps(js)[:200]}"}
+    d = js.get("data", [{}])[0]
+    if d.get("b64_json"):
+        return base64.b64decode(d["b64_json"])
+    if d.get("url"):
+        with urllib.request.urlopen(d["url"], timeout=60, context=_CTX) as r:
+            return r.read()
+    return {"error": "boş cavab"}
+
+
+def card_fields(title, body, brand=None):
+    """LLM → {title, model, features[3]} — sabit-dizayn kart üçün (yalnız fakt)."""
+    if not has_key():
+        return {"error": "OPENAI_API_KEY yoxdur"}
+    b = brand or load_brand()
+    sysmsg = (f"Sən {b['name']} üçün məhsul kartı məlumatı hazırlayırsan. Yalnız verilən mətndəki "
+              f"FAKTLARdan istifadə et — heç nə uydurma.")
+    user = (f"Məhsul başlığı:\n{title}\n\nTəsvir:\n{body}\n\n"
+            'JSON qaytar (başqa heç nə): {"title":"qısa məhsul adı, marka+seriya, max 4 söz", '
+            '"model":"model kodu — varsa; yoxsa boş sətir", '
+            '"features":["3 qısa xüsusiyyət, hər biri max 3 söz, Azərbaycanca"]}. '
+            'Nümunə features: ["16\\" ekran","Gaming performansı","RTX 4070"].')
+    st, js = _post("/chat/completions", {
+        "model": b.get("text_model", "gpt-4o"),
+        "messages": [{"role": "system", "content": sysmsg}, {"role": "user", "content": user}],
+        "response_format": {"type": "json_object"}, "temperature": 0.4})
+    if st != 200:
+        return {"error": f"OpenAI text {st}: {json.dumps(js)[:150]}"}
+    try:
+        o = json.loads(js["choices"][0]["message"]["content"])
+        return {"title": (o.get("title") or title)[:40], "model": (o.get("model") or "")[:30],
+                "features": [str(f) for f in (o.get("features") or [])][:3]}
+    except Exception as e:
+        return {"error": f"parse: {e}"}
+
+
 def brandify_images(src_list, n=None, brand=None):
     """Real şəkilləri (draft foto bytes) PCTECH brendinə çevir → [bytes,...] və ya {error, got}."""
     if not has_key():

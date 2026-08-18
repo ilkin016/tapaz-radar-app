@@ -49,6 +49,11 @@ class DraftStore:
                         (title, body, len(ai_image_bytes_list or []), did))
         self.db.commit()
 
+    def save_text(self, did, title, body):
+        """Yalnız Techbar mətnini saxla (şəkilləri/n_ai_photos-u toxunmadan)."""
+        self.db.execute("UPDATE drafts SET adapted_title=?, adapted_body=? WHERE id=?", (title, body, did))
+        self.db.commit()
+
     def ai_photo_bytes(self, did, i):
         p = os.path.join(MEDIA, str(did), f"ai_{i}.jpg")
         return open(p, "rb").read() if os.path.exists(p) else None

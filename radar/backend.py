@@ -282,7 +282,7 @@ class H(BaseHTTPRequestHandler):
             _DRAFTS.set_status(int(data.get("id")), "rejected"); return self._send(200, {"ok": True})
         if path == "/api/draft/delete":
             _DRAFTS.delete(int(data.get("id"))); return self._send(200, {"ok": True})
-        if path == "/api/draft/ai-adapt":  # PCTECH brend-uyğunlaşdırma (mətn + şəkil)
+        if path == "/api/draft/ai-adapt":  # Techbar MƏTN-uyğunlaşdırma (şəkillər per-şəkil: kart/təmizlə/yüklə)
             did = int(data.get("id"))
             d = _DRAFTS.get(did)
             if not d:
@@ -291,20 +291,8 @@ class H(BaseHTTPRequestHandler):
             txt = ai_brand.adapt_text(d["title"], d["body"])
             if txt.get("error"):
                 return self._send(200, {"stage": "text", "error": txt["error"]})
-            # real tap.az şəkillərini götür → PCTECH brendinə ÇEVİR (məhsul eyni qalır, yalnız fon/təqdimat).
-            # Şəkil yoxdursa yalnız onda sıfırdan generasiya (fallback).
-            src_photos = []
-            for i in range(d.get("n_photos") or 0):
-                pb = _DRAFTS.photo_bytes(did, i)
-                if pb:
-                    src_photos.append(pb)
-            imgs = ai_brand.brandify_images(src_photos) if src_photos else ai_brand.generate_images(txt["title"], txt["body"])
-            if isinstance(imgs, dict) and imgs.get("error"):
-                got = imgs.get("got") or []
-                _DRAFTS.save_adapted(did, txt["title"], txt["body"], got)  # mətn + alınan şəkillər saxla
-                return self._send(200, {"ok": True, "text_done": True, "n_ai_photos": len(got), "image_error": imgs["error"]})
-            _DRAFTS.save_adapted(did, txt["title"], txt["body"], imgs)
-            return self._send(200, {"ok": True, "adapted_title": txt["title"], "n_ai_photos": len(imgs)})
+            _DRAFTS.save_text(did, txt["title"], txt["body"])
+            return self._send(200, {"ok": True, "adapted_title": txt["title"]})
         if path == "/api/draft/rebrand-one":  # tək brendlənmiş şəkli yenidən yarat (mənbə foto[index]-dən)
             did = int(data.get("id")); idx = int(data.get("index", 0))
             d = _DRAFTS.get(did)
@@ -319,6 +307,28 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"error": r["error"]})
             _DRAFTS.save_ai_photo(did, idx, r)
             return self._send(200, {"ok": True, "index": idx})
+        if path == "/api/draft/make-card":  # sabit-dizayn Techbar kartı yarat (ağ məhsul + logo + xüsusiyyət)
+            did = int(data.get("id")); idx = int(data.get("index", 0))
+            d = _DRAFTS.get(did)
+            if not d:
+                return self._send(404, {"error": "draft yoxdur"})
+            src = _DRAFTS.photo_bytes(did, idx)
+            if not src:
+                return self._send(200, {"error": f"#{idx} mənbə şəkli yoxdur"})
+            from radar import ai_brand, card
+            white = ai_brand.product_white(src)
+            if isinstance(white, dict) and white.get("error"):
+                return self._send(200, {"error": "məhsul təmizlənmədi: " + white["error"]})
+            fields = ai_brand.card_fields(d.get("adapted_title") or d["title"], d.get("adapted_body") or d["body"])
+            if isinstance(fields, dict) and fields.get("error"):
+                fields = {"title": d.get("adapted_title") or d["title"], "model": "", "features": []}
+            try:
+                img = card.build_card(white, fields["title"], fields.get("model", ""),
+                                      fields.get("features", []), ai_brand.load_brand())
+            except Exception as e:
+                return self._send(200, {"error": f"kart montajı: {str(e)[:120]}"})
+            _DRAFTS.save_ai_photo(did, idx, img)
+            return self._send(200, {"ok": True, "index": idx, "fields": fields})
         if path == "/api/draft/replace-photo":  # operator ÖZ şəklini yükləyir → ai_<index> əvəz/əlavə
             did = int(data.get("id")); idx = int(data.get("index", 0))
             d = _DRAFTS.get(did)
@@ -346,13 +356,13 @@ class H(BaseHTTPRequestHandler):
             d = _DRAFTS.get(did)
             if not d:
                 return self._send(404, {"error": "draft yoxdur"})
-            use_ai = (d.get("n_ai_photos") or 0) > 0  # AI şəkillər varsa onları, yoxsa orijinalı
             title = d.get("adapted_title") or d["title"]
             body = d.get("adapted_body") or d["body"]
             photo_ids = []
-            n = (d.get("n_ai_photos") or 0) if use_ai else (d.get("n_photos") or 0)
+            # HƏR ŞƏKİL üzrə: brendli/kart varsa onu, yoxsa orijinalı işlət (operator seçiminə uyğun)
+            n = max(d.get("n_photos") or 0, d.get("n_ai_photos") or 0)
             for i in range(n):
-                b = _DRAFTS.ai_photo_bytes(did, i) if use_ai else _DRAFTS.photo_bytes(did, i)
+                b = _DRAFTS.ai_photo_bytes(did, i) or _DRAFTS.photo_bytes(did, i)
                 if b:
                     try:
                         pid = poster.reupload_photo(_AUTH, b, f"{i}.jpg")
