@@ -278,11 +278,15 @@ class H(BaseHTTPRequestHandler):
             ad = poster.read_ad_for_repost(q.get("id", ""))
             if ad.get("error"):
                 return self._send(200, ad)
-            existing = {str(d.get("source_id")) for d in _DRAFTS.list()}
+            drafts = {str(x.get("source_id")): x for x in _DRAFTS.list()}
+            dr = drafts.get(ad["numeric_id"])
             return self._send(200, {"id": ad["numeric_id"], "title": ad.get("title"), "body": ad.get("body"),
                                     "price": ad.get("price"), "photos": ad.get("photos", []),
                                     "params": ad.get("params", {}), "category_slug": ad.get("category_slug"),
-                                    "link": ad.get("link"), "already": ad["numeric_id"] in existing})
+                                    "link": ad.get("link"), "already": bool(dr),
+                                    "draft_id": (dr["id"] if dr else None),
+                                    "draft_status": (dr.get("status") if dr else None),
+                                    "n_ai_photos": ((dr.get("n_ai_photos") or 0) if dr else 0)})
         if path == "/api/draft/get":
             d = _DRAFTS.get(int(q.get("id", 0)))
             return self._send(200, d) if d else self._send(404, {"error": "draft yoxdur"})

@@ -978,10 +978,24 @@ async function openStorePreview(id){let ov=document.getElementById('stprev');
     <div style="display:flex;gap:7px;overflow-x:auto;margin-top:8px;padding-bottom:4px">${ph.map((u,i)=>`<img src="${esc(u)}" data-pv="${i}" style="width:62px;height:62px;object-fit:cover;border-radius:8px;border:2px solid ${i?'transparent':'var(--acc2)'};cursor:pointer;flex-shrink:0;background:#fff">`).join('')}</div>`:''}
    ${Object.keys(d.params||{}).length?`<div style="margin-top:16px"><div style="font-weight:700;margin-bottom:6px">Xüsusiyyətlər</div><table style="width:100%;border-collapse:collapse;font-size:13px">${Object.entries(d.params).map(([k,v])=>`<tr><td style="padding:4px 10px 4px 0;color:var(--muted);white-space:nowrap;vertical-align:top">${esc(k)}</td><td style="padding:4px 0;font-weight:600">${esc(String(v))}</td></tr>`).join('')}</table></div>`:''}
    ${d.body?`<div style="margin-top:16px"><div style="font-weight:700;margin-bottom:6px">Təsvir</div><div class="small" style="white-space:pre-wrap;line-height:1.55">${esc(d.body)}</div></div>`:''}
-   <div class="controls" style="margin-top:18px">${d.already?'<span class="chip" style="cursor:default;background:var(--good);color:#fff">✓ sistemdə var</span>':`<button class="chip on" id="stpv_imp">📥 PCTECH-ə əlavə et</button>`}<a class="chip" href="${esc(d.link||'#')}" target="_blank" style="text-decoration:none">↗ tap.az-da aç</a></div>
+   <div id="stpv_msg" class="small" style="margin-top:14px;min-height:16px"></div>
+   <div class="controls" id="stpv_act" style="margin-top:6px"></div>
   </div>`;
  box.querySelectorAll('[data-pv]').forEach(t=>t.onclick=()=>{document.getElementById('stpv_main').src=t.src;box.querySelectorAll('[data-pv]').forEach(x=>x.style.borderColor='transparent');t.style.borderColor='var(--acc2)';});
- const ib=document.getElementById('stpv_imp');if(ib)ib.onclick=async()=>{ib.textContent='⏳…';ib.disabled=true;const r=await api('/api/stores/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({listing_id:id})});if(r.ok){ib.textContent='✓ əlavə olundu';ib.style.background='var(--good)';loadStoreProducts(true);}else{ib.textContent='⚠️ '+esc((r.error||'')).slice(0,30);ib.disabled=false;}};}
+ renderPvActions(d,id);}
+function pvMsg(h){const el=document.getElementById('stpv_msg');if(el)el.innerHTML=h;}
+function pvShowCard(did){const m=document.getElementById('stpv_main');if(m)m.src='/drafts_media/'+did+'/ai_0.jpg?v='+Date.now();}
+function renderPvActions(d,id){const el=document.getElementById('stpv_act');if(!el)return;const JH={'Content-Type':'application/json'};const g=x=>document.getElementById(x);
+ let h='';
+ if(d.draft_status==='posted')h='<span class="chip" style="cursor:default;background:var(--good);color:#fff">✓ tap.az-a göndərilib</span>';
+ else if(d.draft_id)h=`<button class="chip on" id="stpv_card">${(d.n_ai_photos>0)?'🔄 AI PCTECH kart (yenidən)':'🟩 AI PCTECH kart'}</button><button class="chip on" id="stpv_appr" style="background:var(--good)">✅ Təsdiqlə → tap.az</button>`;
+ else h='<button class="chip on" id="stpv_imp">📥 PCTECH-ə əlavə et</button>';
+ h+=`<a class="chip" href="${esc(d.link||'#')}" target="_blank" style="text-decoration:none">↗ tap.az-da aç</a>`;
+ el.innerHTML=h;
+ if(g('stpv_imp'))g('stpv_imp').onclick=async()=>{g('stpv_imp').textContent='⏳…';g('stpv_imp').disabled=true;const r=await api('/api/stores/import',{method:'POST',headers:JH,body:JSON.stringify({listing_id:id})});if(r.ok){d.draft_id=r.draft_id;d.draft_status='pending';d.n_ai_photos=0;pvMsg('✅ Sistemə əlavə olundu — draft #'+r.draft_id);renderPvActions(d,id);loadStoreProducts(true);}else{g('stpv_imp').textContent='⚠️';g('stpv_imp').disabled=false;}};
+ if(g('stpv_card'))g('stpv_card').onclick=async()=>{const b=g('stpv_card');b.textContent='⏳ Kart yaradılır (~30s)…';b.disabled=true;pvMsg('🟩 AI PCTECH kartı yaradılır (məhsul təmizlənir + montaj)…');const r=await api('/api/draft/make-card',{method:'POST',headers:JH,body:JSON.stringify({id:d.draft_id,index:0})});if(r.ok){d.n_ai_photos=Math.max(1,d.n_ai_photos||1);pvShowCard(d.draft_id);pvMsg('✅ AI PCTECH kart hazırdır — indi «Təsdiqlə» edə bilərsən.');loadStoreProducts(true);}else pvMsg('⚠️ '+esc((r.error||JSON.stringify(r)).slice(0,140)));renderPvActions(d,id);};
+ if(g('stpv_appr'))g('stpv_appr').onclick=async()=>{if(!confirm('Bu məhsul tap.az moderasiyasına göndərilsin?'))return;const b=g('stpv_appr');b.textContent='Göndərilir…';b.disabled=true;const r=await api('/api/draft/approve',{method:'POST',headers:JH,body:JSON.stringify({id:d.draft_id})});if(r.ok){d.draft_status='posted';pvMsg('✅ tap.az-a göndərildi · status: '+esc(((r.status||{}).label||(r.status||{}).status||'')));renderPvActions(d,id);loadStoreProducts(true);}else{pvMsg('⚠️ '+esc(JSON.stringify(r).slice(0,160)));renderPvActions(d,id);}};
+}
 function updStSel(){const cks=[...document.querySelectorAll('.st_ck:not(:disabled)')];const sel=cks.filter(c=>c.checked);const btn=document.getElementById('st_import');if(btn){btn.disabled=!sel.length;btn.textContent='📥 Seçilənləri PCTECH-ə'+(sel.length?' ('+sel.length+')':'');}}
 async function pollSync(){const el=document.getElementById('st_synced');const b=document.getElementById('st_sync');const r=await api('/api/stores/sync-status');
  if(r.running){if(el)el.innerHTML='🔄 sync gedir… ('+r.count+' məhsul)';setTimeout(pollSync,1500);}
