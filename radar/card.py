@@ -129,8 +129,23 @@ def _trust_glyph(d, kind, cx, cy, r, color):
         d.line([cx - s * 0.1, cy + s * 0.4, cx + s * 0.5, cy - s * 0.35], fill=color, width=w)
 
 
+def _chip_badge(d, cx, cy, s, color):
+    """Mikroçip (IT ikonu) — badge içində. cx,cy mərkəz; s çip yarım-ölçüsü."""
+    w = max(3, int(s / 4.5))
+    d.rounded_rectangle([cx - s, cy - s, cx + s, cy + s], radius=int(s * 0.28), outline=color, width=w)
+    d.rounded_rectangle([cx - s * 0.4, cy - s * 0.4, cx + s * 0.4, cy + s * 0.4], radius=int(s * 0.18),
+                        outline=color, width=max(2, w - 1))
+    pl = s * 0.45
+    for i in (-0.5, 0.0, 0.5):
+        off = i * s * 1.4
+        d.line([cx + off, cy - s - pl, cx + off, cy - s], fill=color, width=w)
+        d.line([cx + off, cy + s, cx + off, cy + s + pl], fill=color, width=w)
+        d.line([cx - s - pl, cy + off, cx - s, cy + off], fill=color, width=w)
+        d.line([cx + s, cy + off, cx + s + pl, cy + off], fill=color, width=w)
+
+
 def build_card(product_img_bytes, title, model="", features=None, brand=None, size=None, category=""):
-    """Sadə ağ fon + çərçivə: Techbar məhsul kartı → JPEG bytes."""
+    """Sadə ağ fon + çərçivə: PCTECH məhsul kartı → JPEG bytes."""
     b = brand or {}
     blue = _hex(b.get("card_color") or (b.get("colors") or {}).get("primary") or "#2F56E0")
     ink = _hex((b.get("colors") or {}).get("text") or "#1A2233")
@@ -147,20 +162,11 @@ def build_card(product_img_bytes, title, model="", features=None, brand=None, si
     inl = pad + int(W * 0.028)   # daxili sol
     inr = W - pad - int(W * 0.028)
 
-    # ---- logo (tək) yuxarı-sol — geniş "techbar" wordmark ----
-    logo_h, logo_w = int(H * 0.052), int(W * 0.28)
-    lx, ly = inl, pad + int(H * 0.042)
-    logo_path = os.path.join(ROOT, b.get("logo_file", "")) if b.get("logo_file") else ""
-    placed = False
-    if logo_path and os.path.exists(logo_path):
-        try:
-            lg = _fit_contain(Image.open(logo_path), logo_w, logo_h)
-            canvas.paste(lg, (lx, ly), lg); placed = True
-        except Exception:
-            placed = False
-    if not placed:
-        mark = techbar_mark(int(H * 0.07), blue + (255,))
-        canvas.paste(mark, (lx, ly), mark)
+    # ---- yuxarı-sağ: kiçik IT ikonu (mavi badge + ağ mikroçip) ----
+    bsz = int(H * 0.085)
+    bx, by = inr - bsz, pad + int(H * 0.045)
+    d.rounded_rectangle([bx, by, bx + bsz, by + bsz], radius=int(bsz * 0.24), fill=blue)
+    _chip_badge(d, bx + bsz / 2, by + bsz / 2, bsz * 0.24, (255, 255, 255))
 
     # ---- sol: məhsul (təmiz ağ fonda, kəsilmədən) ----
     bx0, by0, bx1, by1 = inl, int(H * 0.17), int(W * 0.50), int(H * 0.82)
@@ -199,20 +205,27 @@ def build_card(product_img_bytes, title, model="", features=None, brand=None, si
         tb = d.textbbox((0, 0), f, font=fnt_feat)
         d.text((tx, cy - (tb[3] - tb[1]) / 2 - tb[1]), f, font=fnt_feat, fill=ink)
 
-    # ---- altda incə əlaqə sətri (çərçivə daxilində, mərkəz) ----
-    items = [("globe", b.get("website", "")), ("phone", b.get("phone", "")), ("check", b.get("guarantee", ""))]
+    # ---- altda: PCTECH + nömrə + zəmanət (SAYT YOX) ----
+    items = [("brand", b.get("name", "PCTECH")), ("phone", b.get("phone", "")), ("check", b.get("guarantee", ""))]
     items = [(k, v) for k, v in items if v]
     if items:
         fnt_c = _font(int(H * 0.028), bold=True)
-        gr = int(H * 0.016); gap = int(W * 0.035); icon_gap = int(W * 0.008)
-        widths = [2 * gr + icon_gap + d.textlength(v, font=fnt_c) for _, v in items]
+        fnt_b = _font(int(H * 0.036), bold=True)  # brend adı bir az böyük
+        gr = int(H * 0.016); gap = int(W * 0.038); icon_gap = int(W * 0.008)
+        def _segw(k, v):
+            return d.textlength(v, font=fnt_b) if k == "brand" else 2 * gr + icon_gap + d.textlength(v, font=fnt_c)
+        widths = [_segw(k, v) for k, v in items]
         total = sum(widths) + gap * (len(items) - 1)
         x = (W - total) / 2
         cy = H - pad - int(H * 0.045)
         for (k, v), wseg in zip(items, widths):
-            _trust_glyph(d, k, x + gr, cy, gr, blue)
-            tb = d.textbbox((0, 0), v, font=fnt_c)
-            d.text((x + 2 * gr + icon_gap, cy - (tb[3] - tb[1]) / 2 - tb[1]), v, font=fnt_c, fill=blue)
+            if k == "brand":
+                tb = d.textbbox((0, 0), v, font=fnt_b)
+                d.text((x, cy - (tb[3] - tb[1]) / 2 - tb[1]), v, font=fnt_b, fill=blue)
+            else:
+                _trust_glyph(d, k, x + gr, cy, gr, blue)
+                tb = d.textbbox((0, 0), v, font=fnt_c)
+                d.text((x + 2 * gr + icon_gap, cy - (tb[3] - tb[1]) / 2 - tb[1]), v, font=fnt_c, fill=blue)
             x += wseg + gap
 
     out = io.BytesIO()
