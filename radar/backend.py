@@ -90,6 +90,33 @@ def _import_one(lid):
     return {"ok": True, "draft_id": _DRAFTS.create(lid, ad, imgs)}
 
 
+def _make_ai_image(d, did, idx, style="card"):
+    """Bir şəkli hazırla: style=card (çərçivəli PCTECH kart) / white (təmiz ağ fon) / original (olduğu kimi)."""
+    from radar import ai_brand, card
+    src = _DRAFTS.photo_bytes(did, idx)
+    if not src:
+        return {"error": f"#{idx} mənbə şəkli yoxdur"}
+    if style == "original":
+        _DRAFTS.save_ai_photo(did, idx, src)
+        return {"ok": True, "index": idx, "style": "original"}
+    white = ai_brand.product_white(src)
+    if isinstance(white, dict) and white.get("error"):
+        return {"error": "məhsul təmizlənmədi: " + white["error"]}
+    if style == "white":
+        _DRAFTS.save_ai_photo(did, idx, card.on_white(white))
+        return {"ok": True, "index": idx, "style": "white"}
+    fields = ai_brand.card_fields(d.get("adapted_title") or d["title"], d.get("adapted_body") or d["body"])
+    if isinstance(fields, dict) and fields.get("error"):
+        fields = {"title": d.get("adapted_title") or d["title"], "model": "", "features": [], "category": ""}
+    try:
+        img = card.build_card(white, fields["title"], fields.get("model", ""), fields.get("features", []),
+                              ai_brand.load_brand(), category=fields.get("category", ""))
+    except Exception as e:
+        return {"error": f"kart montajı: {str(e)[:120]}"}
+    _DRAFTS.save_ai_photo(did, idx, img)
+    return {"ok": True, "index": idx, "style": "card", "fields": fields}
+
+
 _SYNC = {"running": False, "slug": None, "count": 0, "done": None, "error": None}
 
 
@@ -484,29 +511,28 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"error": r["error"]})
             _DRAFTS.save_ai_photo(did, idx, r)
             return self._send(200, {"ok": True, "index": idx})
-        if path == "/api/draft/make-card":  # sabit-dizayn Techbar kartı yarat (ağ məhsul + logo + xüsusiyyət)
+        if path == "/api/draft/make-card":  # bir şəkil: style=card (çərçivəli) / white (ağ fon) / original
             did = int(data.get("id")); idx = int(data.get("index", 0))
             d = _DRAFTS.get(did)
             if not d:
                 return self._send(404, {"error": "draft yoxdur"})
-            src = _DRAFTS.photo_bytes(did, idx)
-            if not src:
-                return self._send(200, {"error": f"#{idx} mənbə şəkli yoxdur"})
-            from radar import ai_brand, card
-            white = ai_brand.product_white(src)
-            if isinstance(white, dict) and white.get("error"):
-                return self._send(200, {"error": "məhsul təmizlənmədi: " + white["error"]})
-            fields = ai_brand.card_fields(d.get("adapted_title") or d["title"], d.get("adapted_body") or d["body"])
-            if isinstance(fields, dict) and fields.get("error"):
-                fields = {"title": d.get("adapted_title") or d["title"], "model": "", "features": []}
-            try:
-                img = card.build_card(white, fields["title"], fields.get("model", ""),
-                                      fields.get("features", []), ai_brand.load_brand(),
-                                      category=fields.get("category", ""))
-            except Exception as e:
-                return self._send(200, {"error": f"kart montajı: {str(e)[:120]}"})
-            _DRAFTS.save_ai_photo(did, idx, img)
-            return self._send(200, {"ok": True, "index": idx, "fields": fields})
+            return self._send(200, _make_ai_image(d, did, idx, data.get("style", "card")))
+        if path == "/api/draft/make-set":  # DƏST: 1-ci çərçivəli kart + qalanları ağ fon (2-3 şəkil)
+            did = int(data.get("id")); n = int(data.get("n", 3))
+            d = _DRAFTS.get(did)
+            if not d:
+                return self._send(404, {"error": "draft yoxdur"})
+            npho = d.get("n_photos") or 0
+            if not npho:
+                return self._send(200, {"error": "mənbə şəkil yoxdur"})
+            n = max(1, min(n, npho))
+            out = []
+            for i in range(n):
+                r = _make_ai_image(d, did, i, "card" if i == 0 else "white")
+                out.append(r)
+                if i == 0 and r.get("error"):
+                    return self._send(200, {"error": r["error"]})
+            return self._send(200, {"ok": True, "n": n, "results": out})
         if path == "/api/draft/replace-photo":  # operator ÖZ şəklini yükləyir → ai_<index> əvəz/əlavə
             did = int(data.get("id")); idx = int(data.get("index", 0))
             d = _DRAFTS.get(did)

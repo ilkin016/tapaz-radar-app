@@ -48,6 +48,15 @@ def _fit_contain(img, bw, bh):
     return img.resize((max(1, int(img.width * r)), max(1, int(img.height * r))), Image.LANCZOS)
 
 
+def on_white(img_bytes):
+    """Şəffaf/PNG məhsul şəklini → təmiz AĞ fonda JPEG (çərçivəsiz sadə şəkil üçün)."""
+    im = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+    bg = Image.new("RGB", im.size, (255, 255, 255))
+    bg.paste(im, (0, 0), im)
+    out = io.BytesIO(); bg.save(out, "JPEG", quality=92)
+    return out.getvalue()
+
+
 def techbar_mark(D, color=(47, 86, 224, 255)):
     """Techbar logosu — split-dairə (üst+alt boşluqlu halqa, içi boş). Şəffaf RGBA."""
     S = D * 4
