@@ -26,7 +26,7 @@ from radar import poster
 from radar.tapaz_auth import AuthClient
 from radar.drafts import DraftStore, MEDIA as DRAFT_MEDIA
 from radar.users import Users
-from radar.stores import StoreStore, store_products
+from radar.stores import StoreStore
 
 _AUTH = AuthClient(verbose=True)  # digit-u xam cavablarını jurnalla (debug)
 _AUTH.load()  # Keychain-dən mövcud sessiya
@@ -88,6 +88,40 @@ def _import_one(lid):
         except Exception:
             pass
     return {"ok": True, "draft_id": _DRAFTS.create(lid, ad, imgs)}
+
+
+_SYNC = {"running": False, "slug": None, "count": 0, "done": None, "error": None}
+
+
+def _run_sync(slug):
+    _SYNC.update(running=True, slug=slug, count=0, done=None, error=None)
+    try:
+        r = _STORES.sync(slug)
+        _SYNC["count"] = r.get("count", 0); _SYNC["error"] = r.get("error")
+    except Exception as e:
+        _SYNC["error"] = str(e)[:150]
+    _SYNC.update(running=False, done=time.strftime("%H:%M:%S"))
+
+
+def _store_daemon():
+    """Gündəlik sync: last_sync 20 saatdan köhnə olan mağazaları avtomatik yenilə (saatda bir yoxlanır)."""
+    import datetime
+    while True:
+        try:
+            for st in _STORES.list():
+                if _REFRESH["running"] or _SYNC["running"] or _BULK["running"]:
+                    break
+                ls, stale = st.get("last_sync"), True
+                if ls:
+                    try:
+                        stale = (datetime.datetime.now() - datetime.datetime.strptime(ls, "%Y-%m-%d %H:%M")).total_seconds() > 20 * 3600
+                    except Exception:
+                        stale = True
+                if stale:
+                    _run_sync(st["slug"])
+        except Exception:
+            pass
+        time.sleep(3600)
 
 
 def _run_refresh(only=None):
@@ -215,19 +249,26 @@ class H(BaseHTTPRequestHandler):
             if not self._sysuser():
                 return self._send(401, {"error": "giriş lazımdır"})
             return self._send(200, {"stores": _STORES.list()})
+        if path == "/api/stores/categories":
+            if not self._sysuser():
+                return self._send(401, {"error": "giriş lazımdır"})
+            return self._send(200, _STORES.cats(q.get("slug", "")))
+        if path == "/api/stores/sync-status":
+            return self._send(200, _SYNC)
         if path == "/api/stores/products":
             if not self._sysuser():
                 return self._send(401, {"error": "giriş lazımdır"})
-            if _REFRESH["running"]:
-                return self._send(200, {"error": "Skan gedir — bitəndən sonra", "items": []})
             st = _STORES.get(q.get("slug", ""))
             if not st:
                 return self._send(200, {"error": "mağaza yoxdur", "items": []})
-            res = store_products(st["user_legacy_id"], first=int(q.get("first", 24)), after=q.get("after") or None)
+            res = _STORES.cached(q.get("slug"), category=q.get("category"),
+                                 limit=int(q.get("limit", 24)), offset=int(q.get("offset", 0)))
             existing = {str(d.get("source_id")) for d in _DRAFTS.list()}
             for it in res.get("items", []):
                 it["already"] = it["id"] in existing
-            res["store"] = {"name": st["name"], "slug": st["slug"], "ads_count": st["ads_count"], "logo_url": st.get("logo_url")}
+            res["store"] = {"name": st["name"], "slug": st["slug"], "ads_count": st.get("ads_count"),
+                            "last_sync": st.get("last_sync"), "logo_url": st.get("logo_url")}
+            res["need_sync"] = (st.get("last_sync") is None)
             return self._send(200, res)
         if path == "/api/draft/get":
             d = _DRAFTS.get(int(q.get("id", 0)))
@@ -298,7 +339,20 @@ class H(BaseHTTPRequestHandler):
         if (path.startswith("/api/draft/") or path.startswith("/api/stores/")) and not su:
             return self._send(401, {"error": "sistemə giriş lazımdır (login)"})
         if path == "/api/stores/add":
-            return self._send(200, _STORES.add(data.get("url") or data.get("slug", "")))
+            r = _STORES.add(data.get("url") or data.get("slug", ""))
+            if r.get("ok") and not _SYNC["running"] and not _REFRESH["running"]:
+                threading.Thread(target=_run_sync, args=(r["store"]["slug"],), daemon=True).start()
+            return self._send(200, r)
+        if path == "/api/stores/sync":  # əl ilə: mağazanı İNDİ yenilə (keş)
+            if _REFRESH["running"]:
+                return self._send(200, {"error": "Skan gedir — bitəndən sonra"})
+            if _SYNC["running"]:
+                return self._send(200, {"error": "Sync artıq gedir", "slug": _SYNC["slug"]})
+            slug = data.get("slug", "")
+            if not _STORES.get(slug):
+                return self._send(200, {"error": "mağaza yoxdur"})
+            threading.Thread(target=_run_sync, args=(slug,), daemon=True).start()
+            return self._send(200, {"ok": True, "started": True})
         if path == "/api/stores/remove":
             return self._send(200, _STORES.remove(data.get("slug", "")))
         if path == "/api/stores/import":  # bir məhsulu PCTECH-ə (draft)
@@ -504,6 +558,7 @@ class H(BaseHTTPRequestHandler):
 
 def serve(port=8091):
     srv = ThreadingHTTPServer(("127.0.0.1", port), H)
+    threading.Thread(target=_store_daemon, daemon=True).start()  # gündəlik mağaza sync
     print(f"Mac-local backend: http://127.0.0.1:{port}/  (login: {bool(_AUTH.user)})")
     srv.serve_forever()
 
