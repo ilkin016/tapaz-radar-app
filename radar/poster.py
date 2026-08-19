@@ -72,6 +72,8 @@ def read_ad_for_repost(numeric_id):
         "region": ad.get("region"), "title": ad.get("title"), "body": ad.get("body"),
         "price": ad.get("price"), "status": ad.get("status"),
         "properties": {"collection": coll, "boolean": boolean},
+        "params": {p.get("name"): p.get("value") for p in ad.get("properties", []) if p.get("name")},
+        "link": ("https://tap.az" + path) if path else f"https://tap.az/elanlar/elektronika/{cat_slug}/{numeric_id}",
         "photos": photos, "n_photos": len(photos),
     }
 

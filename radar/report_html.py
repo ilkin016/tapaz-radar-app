@@ -142,6 +142,27 @@ a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
 .catcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px}
 .catcard{background:linear-gradient(160deg,var(--acc-soft),var(--panel));border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;transition:transform .12s,border-color .12s,box-shadow .12s}
 .catcard:hover{border-color:var(--acc2);transform:translateY(-3px);box-shadow:0 10px 24px rgba(37,99,235,.16)}.catcard .b{font-size:25px;font-weight:800;margin:5px 0;letter-spacing:-.5px}
+.stpill{display:inline-flex;align-items:center;gap:9px;background:var(--panel2);border:1.5px solid var(--line);border-radius:13px;padding:8px 13px;cursor:pointer;transition:all .12s;font-weight:600;font-size:13.5px}
+.stpill:hover{border-color:var(--acc2);transform:translateY(-1px)}
+.stpill.on{border-color:var(--acc2);background:var(--acc-soft);box-shadow:0 0 0 3px rgba(47,86,224,.12)}
+.stpill img{width:28px;height:28px;border-radius:50%;object-fit:cover;background:#fff;flex-shrink:0}
+.stpill .cnt{background:var(--chip);border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700}
+.stpill .rm{opacity:.35;font-size:13px;padding:0 2px;transition:opacity .12s}
+.stpill:hover .rm{opacity:.75}
+.stcat{background:var(--panel2);border:1px solid var(--line);border-radius:22px;padding:6px 14px;cursor:pointer;font-size:12.5px;font-weight:600;transition:all .1s;white-space:nowrap}
+.stcat:hover{border-color:var(--acc2)}
+.stcat.on{background:var(--acc2);border-color:var(--acc2);color:#fff}
+.stcat .cnt{opacity:.7;font-weight:700;margin-left:4px}
+.stcard{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel);transition:transform .12s,box-shadow .12s,border-color .12s;position:relative}
+.stcard:hover{transform:translateY(-3px);box-shadow:0 10px 22px rgba(37,99,235,.14);border-color:var(--acc2)}
+.stcard .iw{height:150px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:zoom-in}
+.stcard .iw img{width:100%;height:100%;object-fit:contain}
+.stcard .ck{position:absolute;top:9px;left:9px;z-index:2;width:20px;height:20px;cursor:pointer}
+.stcard .zm{position:absolute;top:8px;right:8px;z-index:2;background:rgba(15,23,42,.62);color:#fff;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:600;opacity:0;transition:opacity .12s;pointer-events:none}
+.stcard:hover .zm{opacity:1}
+.stbody{padding:9px 11px}
+.stbody .t{font-weight:700;line-height:1.25;height:34px;overflow:hidden;font-size:13px;cursor:pointer}
+.stbody .p{font-weight:800;color:var(--acc2);margin-top:3px;font-size:15px}
 .muted{color:var(--muted)}.hide{display:none}
 .count{color:var(--muted);font-weight:400;font-size:12px}
 .pager{display:flex;gap:5px;align-items:center;flex-wrap:wrap;padding:12px 2px 2px}
@@ -684,7 +705,7 @@ function render1(){
   const usageC={'Gaming':scored.filter(r=>r.usage==='Gaming').length,'Ofis / Gündəlik':scored.filter(r=>r.usage==='Ofis / Gündəlik').length};
   const condC=countBy(scored,'condition');
   root.innerHTML=kpiStrip(DATA)+
-   `<div class="panel"><h2>Kateqoriyalar <span class="small">— klikləyib bax · 🕒 son yenilənmə tarixi</span></h2><div class="catcards">${META.cats.map(c=>`<div class="catcard" onclick="go('cat:${c.slug}')"><div>${c.label}</div><div class="b">${fmt(c.n)}</div><div class="muted" style="font-size:11px">🕒 ${c.last||'—'}${staleBadge(c.last)}</div></div>`).join('')}</div></div>`+
+   `<div class="panel"><h2>Kateqoriyalar <span class="small">— klikləyib bax · 🕒 son yenilənmə tarixi</span></h2><div class="catcards">${META.cats.map(c=>`<div class="catcard" onclick="go('cat:${c.slug}')" style="position:relative"><div>${c.label}</div><div class="b">${fmt(c.n)}</div><div class="muted" style="font-size:11px">🕒 ${c.last||'—'}${staleBadge(c.last)}</div>${BACKEND?`<button onclick="event.stopPropagation();catSync('${c.slug}',this)" title="Bu kateqoriyanı indi yenilə" style="position:absolute;top:10px;right:10px;background:var(--chip);border:1px solid var(--line);border-radius:8px;padding:3px 8px;cursor:pointer;font-size:13px">🔄</button>`:''}</div>`).join('')}</div></div>`+
    `<div class="grid2">
      <div class="panel"><h2>💰 Qiymət aralığı <span class="small">(200 ₼ · klik→filtr)</span></h2>${cbars(bd.c,bd.ord,k=>k+' ₼','band')}</div>
      <div class="panel"><h2>🏷 Brend <span class="small">(klik→filtr)</span></h2>${cbars(countBy(scored,'brand'),null,x=>x,'brand',10)}</div></div>`+
@@ -915,12 +936,12 @@ function storesView(){
 }
 let STCUR=null,STCAT='all',STOFF=0,STTOTAL=0;
 async function loadStores(){const el=document.getElementById('st_list');if(!el)return;const r=await api('/api/stores/list');const ss=r.stores||[];
- el.innerHTML=ss.length?ss.map(s=>`<span class="chip" data-store="${esc(s.slug)}" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">${s.logo_url?`<img src="${esc(s.logo_url)}" style="width:22px;height:22px;border-radius:50%;object-fit:cover">`:''}${esc(s.name||s.slug)} <span class="cnt">${s.cached||s.ads_count||0}</span> <span data-rmstore="${esc(s.slug)}" style="cursor:pointer;opacity:.55">🗑</span></span>`).join(''):'<span class="muted">Hələ mağaza yoxdur — yuxarıdan link əlavə et.</span>';
+ el.innerHTML=ss.length?ss.map(s=>`<div class="stpill${s.slug===STCUR?' on':''}" data-store="${esc(s.slug)}">${s.logo_url?`<img src="${esc(s.logo_url)}">`:'<span style="width:28px;height:28px;border-radius:50%;background:var(--chip);display:inline-block"></span>'}<span>${esc(s.name||s.slug)}</span> <span class="cnt">${s.cached||s.ads_count||0}</span> <span class="rm" data-rmstore="${esc(s.slug)}" title="sil">🗑</span></div>`).join(''):'<span class="muted">Hələ mağaza yoxdur — yuxarıdan link əlavə et.</span>';
  el.querySelectorAll('[data-store]').forEach(c=>c.onclick=(e)=>{if(e.target.dataset.rmstore!==undefined)return;openStore(c.dataset.store);});
- el.querySelectorAll('[data-rmstore]').forEach(b=>b.onclick=async(e)=>{e.stopPropagation();if(!confirm('Mağaza silinsin?'))return;await api('/api/stores/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:b.dataset.rmstore})});document.getElementById('st_panel').style.display='none';loadStores();});}
-async function openStore(slug){STCUR=slug;STCAT='all';STOFF=0;const p=document.getElementById('st_panel');p.style.display='block';document.getElementById('st_all').checked=false;document.getElementById('st_msg').textContent='';await loadStoreCats();await loadStoreProducts(true);}
+ el.querySelectorAll('[data-rmstore]').forEach(b=>b.onclick=async(e)=>{e.stopPropagation();if(!confirm('Mağaza silinsin?'))return;await api('/api/stores/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:b.dataset.rmstore})});if(STCUR===b.dataset.rmstore){STCUR=null;document.getElementById('st_panel').style.display='none';}loadStores();});}
+async function openStore(slug){STCUR=slug;STCAT='all';STOFF=0;const p=document.getElementById('st_panel');p.style.display='block';document.getElementById('st_all').checked=false;document.getElementById('st_msg').textContent='';loadStores();await loadStoreCats();await loadStoreProducts(true);}
 async function loadStoreCats(){const el=document.getElementById('st_cats');if(!el)return;const r=await api('/api/stores/categories?slug='+encodeURIComponent(STCUR));const cats=r.cats||[];
- el.innerHTML=`<button class="chip${STCAT==='all'?' on':''}" data-cat="all">Hamısı <span class="cnt">${r.total||0}</span></button>`+cats.map(c=>`<button class="chip${STCAT===c.id?' on':''}" data-cat="${esc(c.id)}">${esc(c.name||'—')} <span class="cnt">${c.count}</span></button>`).join('');
+ el.innerHTML=`<div class="stcat${STCAT==='all'?' on':''}" data-cat="all">Hamısı <span class="cnt">${r.total||0}</span></div>`+cats.map(c=>`<div class="stcat${STCAT===c.id?' on':''}" data-cat="${esc(c.id)}">${esc(c.name||'—')} <span class="cnt">${c.count}</span></div>`).join('');
  el.querySelectorAll('[data-cat]').forEach(b=>b.onclick=()=>{STCAT=b.dataset.cat;el.querySelectorAll('[data-cat]').forEach(x=>x.classList.toggle('on',x.dataset.cat===STCAT));loadStoreProducts(true);});}
 async function loadStoreProducts(reset){const grid=document.getElementById('st_grid');if(!grid)return;if(reset){STOFF=0;grid.innerHTML='<span class="muted">Yüklənir…</span>';}
  const r=await api('/api/stores/products?slug='+encodeURIComponent(STCUR)+'&category='+encodeURIComponent(STCAT)+'&offset='+STOFF+'&limit=24');
@@ -928,17 +949,39 @@ async function loadStoreProducts(reset){const grid=document.getElementById('st_g
  if(reset){grid.innerHTML='';STTOTAL=r.total||0;document.getElementById('st_title').textContent=((r.store&&r.store.name)||'Məhsullar');
    const ls=(r.store&&r.store.last_sync);document.getElementById('st_synced').innerHTML=(ls?('🕒 son sync: '+esc(ls)):'⚠️ hələ sync olunmayıb')+' · '+STTOTAL+' məhsul';}
  if(reset&&r.need_sync&&!STTOTAL){grid.innerHTML='<span class="muted">İlk sync gedir… bir neçə saniyə.</span>';pollSync();return;}
- (r.items||[]).forEach(p=>{const card=document.createElement('div');card.style.cssText='border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel2);position:relative';
-   card.innerHTML=`<input type="checkbox" class="st_ck" value="${p.id}" ${p.already?'disabled':''} style="position:absolute;top:7px;left:7px;z-index:2;width:19px;height:19px;cursor:pointer">
-    ${p.photo?`<img src="${esc(p.photo)}" style="width:100%;height:125px;object-fit:cover;display:block">`:'<div style="height:125px;background:var(--chip)"></div>'}
-    <div style="padding:7px 9px"><div class="small" style="font-weight:700;line-height:1.25;height:34px;overflow:hidden">${esc((p.title||'').slice(0,52))}</div>
-     <div style="font-weight:800;color:var(--acc2);margin-top:3px">${p.price||0} ₼</div>
-     <div style="margin-top:6px">${p.already?'<span class="small" style="color:var(--good);font-weight:700">✓ sistemdə</span>':`<button class="chip on" data-imp="${p.id}" style="width:100%;font-size:11px;padding:4px">📥 PCTECH-ə</button>`}</div></div>`;
+ (r.items||[]).forEach(p=>{const card=document.createElement('div');card.className='stcard';
+   card.innerHTML=`<input type="checkbox" class="ck st_ck" value="${p.id}" ${p.already?'disabled':''}>
+    <div class="zm">🔍 bax</div>
+    <div class="iw" data-prev="${p.id}">${p.photo?`<img src="${esc(p.photo)}">`:''}</div>
+    <div class="stbody"><div class="t" data-prev="${p.id}" title="${esc(p.title||'')}">${esc((p.title||'').slice(0,62))}</div>
+     <div class="p">${p.price||0} ₼</div>
+     <div style="margin-top:7px">${p.already?'<span class="small" style="color:var(--good);font-weight:700">✓ sistemdə</span>':`<button class="chip on" data-imp="${p.id}" style="width:100%;font-size:11.5px;padding:5px">📥 PCTECH-ə</button>`}</div></div>`;
    grid.appendChild(card);});
+ grid.querySelectorAll('[data-prev]').forEach(e=>{if(e._b)return;e._b=1;e.onclick=()=>openStorePreview(e.dataset.prev);});
  grid.querySelectorAll('[data-imp]').forEach(b=>{if(b._b)return;b._b=1;b.onclick=async()=>{b.textContent='⏳…';b.disabled=true;const r=await api('/api/stores/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({listing_id:b.dataset.imp})});if(r.ok){b.textContent='✓ əlavə';b.style.background='var(--good)';}else{b.textContent='⚠️';b.disabled=false;}};});
  grid.querySelectorAll('.st_ck').forEach(c=>{if(c._b)return;c._b=1;c.onchange=updStSel;});
  STOFF+=(r.items||[]).length;const mb=document.getElementById('st_more');if(mb)mb.style.display=(STOFF<STTOTAL)?'inline-block':'none';
  updStSel();}
+async function openStorePreview(id){let ov=document.getElementById('stprev');
+ if(!ov){ov=document.createElement('div');ov.id='stprev';ov.style.cssText='position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:20px';document.body.appendChild(ov);ov.onclick=e=>{if(e.target===ov)ov.style.display='none';};}
+ ov.style.display='flex';
+ ov.innerHTML='<div style="background:var(--panel);border-radius:16px;max-width:920px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)"><div style="padding:24px"><span class="muted">Yüklənir…</span></div></div>';
+ const box=ov.firstChild;
+ const d=await api('/api/stores/preview?id='+encodeURIComponent(id));
+ if(d.error){box.innerHTML='<div style="padding:22px"><div class="small">⚠️ '+esc(d.error)+'</div><button class="chip" style="margin-top:8px" onclick="document.getElementById(\'stprev\').style.display=\'none\'">Bağla</button></div>';return;}
+ const ph=d.photos||[];
+ box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:1">
+    <div style="min-width:0"><div style="font-size:19px;font-weight:800;line-height:1.25">${esc(d.title||'')}</div><div style="font-size:22px;font-weight:800;color:var(--acc2);margin-top:3px">${d.price||0} ₼</div></div>
+    <button class="chip" onclick="document.getElementById('stprev').style.display='none'">✕ Bağla</button></div>
+  <div style="padding:18px 22px">
+   ${ph.length?`<img id="stpv_main" src="${esc(ph[0])}" style="width:100%;max-height:360px;object-fit:contain;background:#fff;border-radius:12px">
+    <div style="display:flex;gap:7px;overflow-x:auto;margin-top:8px;padding-bottom:4px">${ph.map((u,i)=>`<img src="${esc(u)}" data-pv="${i}" style="width:62px;height:62px;object-fit:cover;border-radius:8px;border:2px solid ${i?'transparent':'var(--acc2)'};cursor:pointer;flex-shrink:0;background:#fff">`).join('')}</div>`:''}
+   ${Object.keys(d.params||{}).length?`<div style="margin-top:16px"><div style="font-weight:700;margin-bottom:6px">Xüsusiyyətlər</div><table style="width:100%;border-collapse:collapse;font-size:13px">${Object.entries(d.params).map(([k,v])=>`<tr><td style="padding:4px 10px 4px 0;color:var(--muted);white-space:nowrap;vertical-align:top">${esc(k)}</td><td style="padding:4px 0;font-weight:600">${esc(String(v))}</td></tr>`).join('')}</table></div>`:''}
+   ${d.body?`<div style="margin-top:16px"><div style="font-weight:700;margin-bottom:6px">Təsvir</div><div class="small" style="white-space:pre-wrap;line-height:1.55">${esc(d.body)}</div></div>`:''}
+   <div class="controls" style="margin-top:18px">${d.already?'<span class="chip" style="cursor:default;background:var(--good);color:#fff">✓ sistemdə var</span>':`<button class="chip on" id="stpv_imp">📥 PCTECH-ə əlavə et</button>`}<a class="chip" href="${esc(d.link||'#')}" target="_blank" style="text-decoration:none">↗ tap.az-da aç</a></div>
+  </div>`;
+ box.querySelectorAll('[data-pv]').forEach(t=>t.onclick=()=>{document.getElementById('stpv_main').src=t.src;box.querySelectorAll('[data-pv]').forEach(x=>x.style.borderColor='transparent');t.style.borderColor='var(--acc2)';});
+ const ib=document.getElementById('stpv_imp');if(ib)ib.onclick=async()=>{ib.textContent='⏳…';ib.disabled=true;const r=await api('/api/stores/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({listing_id:id})});if(r.ok){ib.textContent='✓ əlavə olundu';ib.style.background='var(--good)';loadStoreProducts(true);}else{ib.textContent='⚠️ '+esc((r.error||'')).slice(0,30);ib.disabled=false;}};}
 function updStSel(){const cks=[...document.querySelectorAll('.st_ck:not(:disabled)')];const sel=cks.filter(c=>c.checked);const btn=document.getElementById('st_import');if(btn){btn.disabled=!sel.length;btn.textContent='📥 Seçilənləri PCTECH-ə'+(sel.length?' ('+sel.length+')':'');}}
 async function pollSync(){const el=document.getElementById('st_synced');const b=document.getElementById('st_sync');const r=await api('/api/stores/sync-status');
  if(r.running){if(el)el.innerHTML='🔄 sync gedir… ('+r.count+' məhsul)';setTimeout(pollSync,1500);}
@@ -1064,6 +1107,10 @@ function bindDrafts(){const g=id=>document.getElementById(id);const J={'Content-
 // Auto-refresh on entry (stale olduqda)
 function banner(html){let b=document.getElementById('refbanner');if(!b){b=document.createElement('div');b.id='refbanner';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99;background:var(--acc2);color:#fff;padding:8px 16px;font-size:13px;text-align:center;box-shadow:var(--shadow)';document.body.appendChild(b);}b.innerHTML=html;b.style.display=html?'block':'none';}
 async function pollRefresh(){const r=await api('/api/refresh-status');if(r.running){banner('🔄 tap.az məlumatları yenilənir… (bu, bir neçə dəqiqə çəkə bilər)');setTimeout(pollRefresh,4000);}else{banner('✅ Yeniləndi! Ən son məlumatları görmək üçün <b>səhifəni yenilə</b> → <button onclick="location.reload()" style="background:#fff;color:var(--acc2);border:none;border-radius:6px;padding:3px 10px;font-weight:700;cursor:pointer">Yenilə</button> <span onclick="banner(\'\')" style="cursor:pointer;margin-left:10px">✕</span>');}}
+async function catSync(slug,btn){if(!BACKEND){banner('⚠️ Sync üçün Mac-local backend lazımdır');return;}if(btn){btn.disabled=true;btn.textContent='⏳';}
+ const r=await api('/api/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({only:slug})});
+ if(r&&r.error){banner('⚠️ '+esc(JSON.stringify(r).slice(0,120)));if(btn){btn.disabled=false;btn.textContent='🔄';}return;}
+ banner('🔄 <b>'+esc(slug)+'</b> kateqoriyası yenilənir…');setTimeout(pollRefresh,3000);}
 async function maybeAutoRefresh(){
  if(!BACKEND)return;
  const dts=META.cats.map(c=>c.last).filter(Boolean).sort();const oldest=dts[0]||'';

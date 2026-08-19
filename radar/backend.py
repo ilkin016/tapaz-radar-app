@@ -270,6 +270,19 @@ class H(BaseHTTPRequestHandler):
                             "last_sync": st.get("last_sync"), "logo_url": st.get("logo_url")}
             res["need_sync"] = (st.get("last_sync") is None)
             return self._send(200, res)
+        if path == "/api/stores/preview":  # bir məhsulun tam tap.az tərkibi (popup)
+            if not self._sysuser():
+                return self._send(401, {"error": "giriş lazımdır"})
+            if _REFRESH["running"]:
+                return self._send(200, {"error": "Skan gedir — bitəndən sonra"})
+            ad = poster.read_ad_for_repost(q.get("id", ""))
+            if ad.get("error"):
+                return self._send(200, ad)
+            existing = {str(d.get("source_id")) for d in _DRAFTS.list()}
+            return self._send(200, {"id": ad["numeric_id"], "title": ad.get("title"), "body": ad.get("body"),
+                                    "price": ad.get("price"), "photos": ad.get("photos", []),
+                                    "params": ad.get("params", {}), "category_slug": ad.get("category_slug"),
+                                    "link": ad.get("link"), "already": ad["numeric_id"] in existing})
         if path == "/api/draft/get":
             d = _DRAFTS.get(int(q.get("id", 0)))
             return self._send(200, d) if d else self._send(404, {"error": "draft yoxdur"})
