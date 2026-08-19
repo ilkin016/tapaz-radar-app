@@ -90,12 +90,12 @@ def _import_one(lid):
     return {"ok": True, "draft_id": _DRAFTS.create(lid, ad, imgs)}
 
 
-def _make_ai_image(d, did, idx, style="card"):
-    """Bir şəkli hazırla: style=card (çərçivəli PCTECH kart) / white (təmiz ağ fon) / original (olduğu kimi)."""
+def _make_ai_image(d, did, idx, style="card", src_idx=None):
+    """Bir şəkli hazırla: style=card (çərçivəli) / white (ağ fon) / original. src_idx: mənbə foto (default idx)."""
     from radar import ai_brand, card
-    src = _DRAFTS.photo_bytes(did, idx)
+    src = _DRAFTS.photo_bytes(did, idx if src_idx is None else src_idx)
     if not src:
-        return {"error": f"#{idx} mənbə şəkli yoxdur"}
+        return {"error": f"#{idx if src_idx is None else src_idx} mənbə şəkli yoxdur"}
     if style == "original":
         _DRAFTS.save_ai_photo(did, idx, src)
         return {"ok": True, "index": idx, "style": "original"}
@@ -525,14 +525,21 @@ class H(BaseHTTPRequestHandler):
             npho = d.get("n_photos") or 0
             if not npho:
                 return self._send(200, {"error": "mənbə şəkil yoxdur"})
-            n = max(1, min(n, npho))
+            # plan: ai_0 = çərçivəli kart(foto0); qalanlar = ağ fon (fərqli fotolardan, yoxdursa eyni fotonun ağ versiyası)
+            plan = [(0, "card")]
+            if npho == 1:
+                plan.append((0, "white"))
+            else:
+                for j in range(1, npho):
+                    plan.append((j, "white"))
+            plan = plan[:max(1, n)]
             out = []
-            for i in range(n):
-                r = _make_ai_image(d, did, i, "card" if i == 0 else "white")
+            for save_idx, (src_idx, style) in enumerate(plan):
+                r = _make_ai_image(d, did, save_idx, style, src_idx=src_idx)
                 out.append(r)
-                if i == 0 and r.get("error"):
+                if save_idx == 0 and r.get("error"):
                     return self._send(200, {"error": r["error"]})
-            return self._send(200, {"ok": True, "n": n, "results": out})
+            return self._send(200, {"ok": True, "n": len(plan), "results": out})
         if path == "/api/draft/replace-photo":  # operator ÖZ şəklini yükləyir → ai_<index> əvəz/əlavə
             did = int(data.get("id")); idx = int(data.get("index", 0))
             d = _DRAFTS.get(did)

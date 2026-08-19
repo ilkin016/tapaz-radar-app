@@ -154,17 +154,49 @@ def build_create_ad_params(ad_data, photo_ids, contact, region_id=None):
 
 
 # ---------------- 4) createAd (DRAFT → moderasiya) ----------------
-_CREATE_AD_Q = ("mutation($adParams: CreateAdAttributes!){ createAd(adParams:$adParams){ "
+_CREATE_AD_Q = ("mutation CreateAd($adParams: CreateAdAttributes!){ createAd(adParams:$adParams){ "
                 "entity{ id legacyResourceId status } errors{ message path } } }")
+_SUBMISSION_Q = ("mutation CreateAdSubmission($status: AdSubmissionStatusEnum!, $source: SourceEnum!, "
+                 "$flowId: ID, $categoryId: ID){ createAdSubmission(status: $status, source: $source, "
+                 "flowId: $flowId, categoryId: $categoryId){ entity errors{ message path } } }")
 
 
-def create_draft(auth, ad_params):
-    """createAd → elan yaradılır (MODERASİYAYA düşür, dərhal canlı olmur)."""
-    st, js = auth._req(GRAPHQL, {"query": _CREATE_AD_Q, "variables": {"adParams": ad_params}},
-                       headers={"Referer": "https://tap.az/", **({"X-CSRF-Token": auth.csrf} if getattr(auth, "csrf", None) else {})})
+def _auth_headers(auth):
+    return {"Referer": "https://tap.az/", **({"X-CSRF-Token": auth.csrf} if getattr(auth, "csrf", None) else {})}
+
+
+def start_ad_flow(auth, category_id):
+    """tap.az yeni elan-axını: START → flowId, sonra CATEGORY_SELECT. flowId qaytarır (və ya {error})."""
+    H = _auth_headers(auth)
+    st, js = auth._req(GRAPHQL, {"operationName": "CreateAdSubmission", "query": _SUBMISSION_Q,
+                                 "variables": {"status": "START", "source": "DESKTOP"}}, headers=H)
+    sub = (js or {}).get("data", {}).get("createAdSubmission") if isinstance(js, dict) else None
+    if not sub or sub.get("errors") or not sub.get("entity"):
+        return {"error": "flow START alınmadı", "resp": (sub or (js if isinstance(js, dict) else str(js)[:200]))}
+    flow_id = sub["entity"]
+    if category_id:
+        st2, js2 = auth._req(GRAPHQL, {"operationName": "CreateAdSubmission", "query": _SUBMISSION_Q,
+                                       "variables": {"status": "CATEGORY_SELECT", "source": "DESKTOP",
+                                                     "flowId": flow_id, "categoryId": category_id}}, headers=H)
+        sub2 = (js2 or {}).get("data", {}).get("createAdSubmission") if isinstance(js2, dict) else None
+        if sub2 and sub2.get("errors"):
+            return {"error": "CATEGORY_SELECT xəta", "resp": sub2["errors"]}
+    return {"ok": True, "flow_id": flow_id}
+
+
+def create_draft(auth, ad_params, use_flow=True):
+    """createAd → elan yaradılır (MODERASİYAYA düşür). tap.az yeni axını: əvvəlcə flow başlat → flowId,
+    sonra createAd(flowId). Flow alınmasa flowId-siz davam edir (köhnə üsul fallback)."""
+    params = dict(ad_params)
+    if use_flow:
+        flow = start_ad_flow(auth, params.get("categoryId"))
+        if flow.get("ok"):
+            params["flowId"] = flow["flow_id"]  # flow uğurlu → flowId əlavə
+    st, js = auth._req(GRAPHQL, {"operationName": "CreateAd", "query": _CREATE_AD_Q,
+                                 "variables": {"adParams": params}}, headers=_auth_headers(auth))
     d = (js or {}).get("data", {}).get("createAd") if isinstance(js, dict) else None
     if not d:
-        return {"ok": False, "resp": js}
+        return {"ok": False, "resp": js if isinstance(js, dict) else str(js)[:300]}
     if d.get("errors"):
         return {"ok": False, "errors": d["errors"]}
     ent = d.get("entity") or {}
