@@ -26,11 +26,13 @@ from radar import poster
 from radar.tapaz_auth import AuthClient
 from radar.drafts import DraftStore, MEDIA as DRAFT_MEDIA
 from radar.users import Users
+from radar.stores import StoreStore, store_products
 
 _AUTH = AuthClient(verbose=True)  # digit-u xam cavablarını jurnalla (debug)
 _AUTH.load()  # Keychain-dən mövcud sessiya
 _DRAFTS = DraftStore()  # BİZİM sistemin daxili qaralama qatı
 _USERS = Users()  # sistem istifadəçiləri (admin/operator)
+_STORES = StoreStore()  # tap.az mağazaları
 _REFRESH = {"running": False, "started": None, "done": None, "log": "", "code": None}
 _BULK = {"running": False, "total": 0, "done": 0, "ok": 0, "fail": 0, "skip": 0, "errors": [], "started": None}
 _ID_RE = re.compile(r"(\d{6,9})")
@@ -72,6 +74,20 @@ def _run_bulk(ids):
             _BULK["fail"] += 1; _BULK["errors"].append(f"#{lid}: {str(e)[:60]}")
         _BULK["done"] += 1
     _BULK["running"] = False
+
+
+def _import_one(lid):
+    """Bir tap.az elanını PCTECH sisteminə (draft) gətir — şəkilləri endirir."""
+    ad = poster.read_ad_for_repost(lid)
+    if ad.get("error"):
+        return {"error": ad["error"]}
+    imgs = []
+    for u in ad.get("photos", []):
+        try:
+            imgs.append(poster.download_photo(u))
+        except Exception:
+            pass
+    return {"ok": True, "draft_id": _DRAFTS.create(lid, ad, imgs)}
 
 
 def _run_refresh(only=None):
@@ -195,6 +211,24 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, {"drafts": _DRAFTS.list(q.get("status"))})
         if path == "/api/draft/bulk-status":
             return self._send(200, _BULK)
+        if path == "/api/stores/list":
+            if not self._sysuser():
+                return self._send(401, {"error": "giriş lazımdır"})
+            return self._send(200, {"stores": _STORES.list()})
+        if path == "/api/stores/products":
+            if not self._sysuser():
+                return self._send(401, {"error": "giriş lazımdır"})
+            if _REFRESH["running"]:
+                return self._send(200, {"error": "Skan gedir — bitəndən sonra", "items": []})
+            st = _STORES.get(q.get("slug", ""))
+            if not st:
+                return self._send(200, {"error": "mağaza yoxdur", "items": []})
+            res = store_products(st["user_legacy_id"], first=int(q.get("first", 24)), after=q.get("after") or None)
+            existing = {str(d.get("source_id")) for d in _DRAFTS.list()}
+            for it in res.get("items", []):
+                it["already"] = it["id"] in existing
+            res["store"] = {"name": st["name"], "slug": st["slug"], "ads_count": st["ads_count"], "logo_url": st.get("logo_url")}
+            return self._send(200, res)
         if path == "/api/draft/get":
             d = _DRAFTS.get(int(q.get("id", 0)))
             return self._send(200, d) if d else self._send(404, {"error": "draft yoxdur"})
@@ -261,8 +295,26 @@ class H(BaseHTTPRequestHandler):
             ai_brand.set_brand({"card_logo": ""})
             return self._send(200, {"ok": True})
         # rol qapısı — draft/AI əməliyyatları sistem girişi tələb edir (operator+admin)
-        if path.startswith("/api/draft/") and not su:
+        if (path.startswith("/api/draft/") or path.startswith("/api/stores/")) and not su:
             return self._send(401, {"error": "sistemə giriş lazımdır (login)"})
+        if path == "/api/stores/add":
+            return self._send(200, _STORES.add(data.get("url") or data.get("slug", "")))
+        if path == "/api/stores/remove":
+            return self._send(200, _STORES.remove(data.get("slug", "")))
+        if path == "/api/stores/import":  # bir məhsulu PCTECH-ə (draft)
+            if _REFRESH["running"]:
+                return self._send(200, {"error": "Skan gedir — bitəndən sonra"})
+            return self._send(200, _import_one(data.get("listing_id")))
+        if path == "/api/stores/import-bulk":  # seçilmiş məhsulları toplu → draft (arxa fon)
+            if _REFRESH["running"]:
+                return self._send(200, {"error": "Skan gedir — bitəndən sonra"})
+            if _BULK["running"]:
+                return self._send(200, {"error": "Toplu import artıq gedir"})
+            ids = [str(i) for i in (data.get("ids") or []) if str(i).strip()]
+            if not ids:
+                return self._send(200, {"error": "seçim yoxdur"})
+            threading.Thread(target=_run_bulk, args=(ids,), daemon=True).start()
+            return self._send(200, {"ok": True, "total": len(ids)})
         if path == "/api/refresh":
             if _REFRESH["running"]:
                 return self._send(200, {"ok": True, "note": "artıq gedir"})
