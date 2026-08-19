@@ -135,7 +135,7 @@ def build_card(product_img_bytes, title, model="", features=None, brand=None, si
     blue = _hex(b.get("card_color") or (b.get("colors") or {}).get("primary") or "#2F56E0")
     ink = _hex((b.get("colors") or {}).get("text") or "#1A2233")
     W, H = tuple(size or b.get("card_size") or (1600, 1200))
-    features = [f for f in (features or []) if f][:3]
+    features = [f for f in (features or []) if f][:5]
 
     canvas = Image.new("RGB", (W, H), (255, 255, 255))
     d = ImageDraw.Draw(canvas)
@@ -147,19 +147,19 @@ def build_card(product_img_bytes, title, model="", features=None, brand=None, si
     inl = pad + int(W * 0.028)   # daxili sol
     inr = W - pad - int(W * 0.028)
 
-    # ---- logo (tək) yuxarı-sol ----
-    logo_d = int(H * 0.072)
-    lx, ly = inl, pad + int(H * 0.035)
+    # ---- logo (tək) yuxarı-sol — geniş "techbar" wordmark ----
+    logo_h, logo_w = int(H * 0.052), int(W * 0.28)
+    lx, ly = inl, pad + int(H * 0.042)
     logo_path = os.path.join(ROOT, b.get("logo_file", "")) if b.get("logo_file") else ""
     placed = False
     if logo_path and os.path.exists(logo_path):
         try:
-            lg = _fit_contain(Image.open(logo_path), logo_d, logo_d)
+            lg = _fit_contain(Image.open(logo_path), logo_w, logo_h)
             canvas.paste(lg, (lx, ly), lg); placed = True
         except Exception:
             placed = False
     if not placed:
-        mark = techbar_mark(logo_d, blue + (255,))
+        mark = techbar_mark(int(H * 0.07), blue + (255,))
         canvas.paste(mark, (lx, ly), mark)
 
     # ---- sol: məhsul (təmiz ağ fonda, kəsilmədən) ----
@@ -184,16 +184,20 @@ def build_card(product_img_bytes, title, model="", features=None, brand=None, si
         d.text((rx, y), model, font=_font(int(H * 0.03), bold=True), fill=(120, 130, 150)); y += int(H * 0.05)
     else:
         y += int(H * 0.012)
-    d.line([rx, y, inr, y], fill=(226, 231, 241), width=3); y += int(H * 0.048)
-    fnt_feat = _font(int(H * 0.03), bold=True)
-    ir = int(H * 0.03)
-    for f in features:
-        cy = y + ir
+    d.line([rx, y, inr, y], fill=(226, 231, 241), width=3); y += int(H * 0.04)
+    # 3-5 parametr — mövcud hündürlüyə görə adaptiv aralıq
+    n = max(1, len(features))
+    ft_top, ft_bot = y, H - pad - int(H * 0.095)
+    row_h = min((ft_bot - ft_top) / n, H * 0.115)
+    ir = int(H * 0.027) if n >= 4 else int(H * 0.030)
+    fnt_feat = _font(int(H * 0.027) if n >= 4 else int(H * 0.031), bold=True)
+    tx = rx + 2 * ir + int(W * 0.016)
+    for i, f in enumerate(features):
+        cy = int(ft_top + row_h * i + row_h / 2)
         d.ellipse([rx, cy - ir, rx + 2 * ir, cy + ir], fill=(238, 242, 252))
         _draw_glyph(d, _icon_kind(f), rx + ir, cy, int(ir * 0.82), blue)
         tb = d.textbbox((0, 0), f, font=fnt_feat)
-        d.text((rx + 2 * ir + int(W * 0.018), cy - (tb[3] - tb[1]) / 2 - tb[1]), f, font=fnt_feat, fill=ink)
-        y += int(H * 0.11)
+        d.text((tx, cy - (tb[3] - tb[1]) / 2 - tb[1]), f, font=fnt_feat, fill=ink)
 
     # ---- altda incə əlaqə sətri (çərçivə daxilində, mərkəz) ----
     items = [("globe", b.get("website", "")), ("phone", b.get("phone", "")), ("check", b.get("guarantee", ""))]

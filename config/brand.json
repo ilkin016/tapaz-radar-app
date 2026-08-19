@@ -6,7 +6,7 @@
   "colors": { "primary": "#2F56E0", "accent": "#2F56E0", "bg": "#FFFFFF", "text": "#1A2233" },
   "card_color": "#2F56E0",
   "card_size": [1600, 1200],
-  "logo_file": "",
+  "logo_file": "config/techbar_logo.png",
   "website": "techbar.az",
   "phone": "+994 50 499 66 56",
   "guarantee": "Rəsmi zəmanət",

@@ -203,21 +203,29 @@ def card_fields(title, body, brand=None):
     sysmsg = (f"Sən {b['name']} üçün məhsul kartı məlumatı hazırlayırsan. Yalnız verilən mətndəki "
               f"FAKTLARdan istifadə et — heç nə uydurma.")
     user = (f"Məhsul başlığı:\n{title}\n\nTəsvir:\n{body}\n\n"
-            'JSON qaytar (başqa heç nə): {"category":"məhsul növü, max 2 söz, Azərbaycanca (məs Gaming noutbuk, Ofis noutbuk, Videokart, Prosessor, Monitor)", '
+            'JSON qaytar (başqa heç nə): {"category":"məhsul növü, max 2 söz, Azərbaycanca (məs Gaming noutbuk, Videokart, Prosessor, Monitor)", '
             '"title":"qısa məhsul adı, marka+seriya, max 4 söz", '
             '"model":"model kodu — varsa; yoxsa boş sətir", '
-            '"features":["3 qısa xüsusiyyət, hər biri max 3 söz, Azərbaycanca"]}. '
-            'Nümunə features: ["16\\" ekran","Gaming performansı","RTX 4070"].')
+            '"features":[...]}. '
+            'QAYDA — features məhsulun ƏSAS TEXNİKİ parametrləridir (dəyərlərlə):\n'
+            '• NOUTBUK/laptop olsa, DƏQİQ bu 5 parametr, bu sıra ilə: CPU, video kart (GPU), RAM, yaddaş (SSD/HDD), ekran. '
+            'Nümunə: ["Core i9-14900HX","RTX 4080","32GB RAM","1TB SSD","16\\" 240Hz"].\n'
+            '• Kompüter/PC olsa: CPU, GPU, RAM, yaddaş, (varsa ana plata).\n'
+            '• Monitor olsa: ölçü, keyfiyyət (FHD/QHD/4K), yeniləmə (Hz), panel, əyri/düz.\n'
+            '• Videokart olsa: model, yaddaş (GB), tip (GDDR6 və s.).\n'
+            '• Prosessor olsa: model, nüvə/thread, tezlik, nəsil.\n'
+            '• Digər kateqoriyalarda: ən vacib 3-5 parametr.\n'
+            'Hər biri çox qısa (max 3-4 söz). Mətndə olmayan dəyəri UYDURMA — sadəcə burax.')
     st, js = _post("/chat/completions", {
         "model": b.get("text_model", "gpt-4o"),
         "messages": [{"role": "system", "content": sysmsg}, {"role": "user", "content": user}],
-        "response_format": {"type": "json_object"}, "temperature": 0.4})
+        "response_format": {"type": "json_object"}, "temperature": 0.3})
     if st != 200:
         return {"error": f"OpenAI text {st}: {json.dumps(js)[:150]}"}
     try:
         o = json.loads(js["choices"][0]["message"]["content"])
         return {"category": (o.get("category") or "")[:24], "title": (o.get("title") or title)[:40],
-                "model": (o.get("model") or "")[:30], "features": [str(f) for f in (o.get("features") or [])][:3]}
+                "model": (o.get("model") or "")[:30], "features": [str(f)[:34] for f in (o.get("features") or [])][:5]}
     except Exception as e:
         return {"error": f"parse: {e}"}
 
