@@ -50,6 +50,19 @@ def has_key():
     return bool(_key())
 
 
+_BRAND_EDITABLE = ("name", "phone", "guarantee", "card_color", "card_icon", "card_logo")
+
+
+def set_brand(fields):
+    """Brend ayarlarını (ad, nömrə, zəmanət, rəng, ikon, logo) brand.json-a saxla."""
+    b = load_brand()
+    for k in _BRAND_EDITABLE:
+        if fields.get(k) is not None:
+            b[k] = fields[k]
+    json.dump(b, open(BRAND_PATH, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    return {"ok": True}
+
+
 def _post(path, payload, timeout=120):
     req = urllib.request.Request(OPENAI + path, data=json.dumps(payload).encode(),
                                  headers={"Content-Type": "application/json",

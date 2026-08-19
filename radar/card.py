@@ -144,6 +144,49 @@ def _chip_badge(d, cx, cy, s, color):
         d.line([cx + s, cy + off, cx + s + pl, cy + off], fill=color, width=w)
 
 
+IT_ICONS = ["chip", "monitor", "code", "laptop", "power", "headset", "gear", "cloud"]
+
+
+def _it_glyph(d, kind, cx, cy, s, color):
+    """Yuxarı-sağ badge üçün seçilə bilən IT ikonları (ağ, mavi badge üstündə)."""
+    w = max(3, int(s / 4.2))
+    if kind == "monitor":
+        d.rounded_rectangle([cx - s, cy - s * 0.82, cx + s, cy + s * 0.35], radius=int(s * 0.14), outline=color, width=w)
+        d.line([cx - s * 0.42, cy + s * 0.72, cx + s * 0.42, cy + s * 0.72], fill=color, width=w)
+        d.line([cx, cy + s * 0.35, cx, cy + s * 0.72], fill=color, width=w)
+    elif kind == "code":
+        d.line([(cx - s * 0.28, cy - s * 0.55), (cx - s * 0.82, cy), (cx - s * 0.28, cy + s * 0.55)], fill=color, width=w, joint="curve")
+        d.line([(cx + s * 0.28, cy - s * 0.55), (cx + s * 0.82, cy), (cx + s * 0.28, cy + s * 0.55)], fill=color, width=w, joint="curve")
+        d.line([cx + s * 0.14, cy - s * 0.62, cx - s * 0.14, cy + s * 0.62], fill=color, width=w)
+    elif kind == "laptop":
+        d.rounded_rectangle([cx - s * 0.62, cy - s * 0.6, cx + s * 0.62, cy + s * 0.18], radius=4, outline=color, width=w)
+        d.line([cx - s * 0.92, cy + s * 0.52, cx + s * 0.92, cy + s * 0.52], fill=color, width=w)
+        d.line([cx - s * 0.62, cy + s * 0.18, cx - s * 0.92, cy + s * 0.52], fill=color, width=w)
+        d.line([cx + s * 0.62, cy + s * 0.18, cx + s * 0.92, cy + s * 0.52], fill=color, width=w)
+    elif kind == "power":
+        d.arc([cx - s * 0.62, cy - s * 0.52, cx + s * 0.62, cy + s * 0.72], start=305, end=235, fill=color, width=w)
+        d.line([cx, cy - s * 0.72, cx, cy - s * 0.02], fill=color, width=w)
+    elif kind == "headset":
+        d.arc([cx - s * 0.62, cy - s * 0.55, cx + s * 0.62, cy + s * 0.55], start=180, end=360, fill=color, width=w)
+        d.rounded_rectangle([cx - s * 0.76, cy - s * 0.02, cx - s * 0.42, cy + s * 0.58], radius=5, fill=color)
+        d.rounded_rectangle([cx + s * 0.42, cy - s * 0.02, cx + s * 0.76, cy + s * 0.58], radius=5, fill=color)
+    elif kind == "gear":
+        import math
+        d.ellipse([cx - s * 0.62, cy - s * 0.62, cx + s * 0.62, cy + s * 0.62], outline=color, width=w)
+        d.ellipse([cx - s * 0.22, cy - s * 0.22, cx + s * 0.22, cy + s * 0.22], outline=color, width=w)
+        for k in range(8):
+            a = k * math.pi / 4
+            d.line([cx + math.cos(a) * s * 0.62, cy + math.sin(a) * s * 0.62,
+                    cx + math.cos(a) * s * 0.92, cy + math.sin(a) * s * 0.92], fill=color, width=w)
+    elif kind == "cloud":
+        d.ellipse([cx - s * 0.85, cy - s * 0.1, cx - s * 0.2, cy + s * 0.5], outline=color, width=w)
+        d.ellipse([cx - s * 0.35, cy - s * 0.55, cx + s * 0.4, cy + s * 0.35], outline=color, width=w)
+        d.ellipse([cx + s * 0.15, cy - s * 0.15, cx + s * 0.85, cy + s * 0.5], outline=color, width=w)
+        d.rectangle([cx - s * 0.55, cy + s * 0.3, cx + s * 0.55, cy + s * 0.52], fill=color)
+    else:  # "chip" (default)
+        _chip_badge(d, cx, cy, s, color)
+
+
 def build_card(product_img_bytes, title, model="", features=None, brand=None, size=None, category=""):
     """Sadə ağ fon + çərçivə: PCTECH məhsul kartı → JPEG bytes."""
     b = brand or {}
@@ -162,11 +205,21 @@ def build_card(product_img_bytes, title, model="", features=None, brand=None, si
     inl = pad + int(W * 0.028)   # daxili sol
     inr = W - pad - int(W * 0.028)
 
-    # ---- yuxarı-sağ: kiçik IT ikonu (mavi badge + ağ mikroçip) ----
-    bsz = int(H * 0.085)
-    bx, by = inr - bsz, pad + int(H * 0.045)
-    d.rounded_rectangle([bx, by, bx + bsz, by + bsz], radius=int(bsz * 0.24), fill=blue)
-    _chip_badge(d, bx + bsz / 2, by + bsz / 2, bsz * 0.24, (255, 255, 255))
+    # ---- yuxarı-sağ: yüklənmiş logo VƏ YA seçilmiş IT ikonu (mavi badge) ----
+    clogo = b.get("card_logo")
+    clogo_path = os.path.join(ROOT, clogo) if clogo else ""
+    used_logo = False
+    if clogo_path and os.path.exists(clogo_path):
+        try:
+            lg = _fit_contain(Image.open(clogo_path), int(W * 0.17), int(H * 0.10))
+            canvas.paste(lg, (inr - lg.width, pad + int(H * 0.04)), lg); used_logo = True
+        except Exception:
+            used_logo = False
+    if not used_logo:
+        bsz = int(H * 0.085)
+        bx, by = inr - bsz, pad + int(H * 0.045)
+        d.rounded_rectangle([bx, by, bx + bsz, by + bsz], radius=int(bsz * 0.24), fill=blue)
+        _it_glyph(d, b.get("card_icon", "code"), bx + bsz / 2, by + bsz / 2, bsz * 0.26, (255, 255, 255))
 
     # ---- sol: məhsul (təmiz ağ fonda, kəsilmədən) ----
     bx0, by0, bx1, by1 = inl, int(H * 0.17), int(W * 0.50), int(H * 0.82)

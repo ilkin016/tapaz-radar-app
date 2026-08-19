@@ -86,6 +86,22 @@ def _run_refresh(only=None):
     _REFRESH.update(running=False, done=time.strftime("%H:%M:%S"))
 
 
+_SAMPLE_SPECS = ["Core i9-14900HX", "RTX 4080", "32GB DDR5", "1TB SSD", "16\" 240Hz"]
+
+
+def _brand_preview(overrides):
+    """Nümunə kartı cari brend + (query) override-larla render et → JPEG bytes."""
+    from radar import ai_brand, card
+    b = dict(ai_brand.load_brand())
+    for k in ("name", "phone", "guarantee", "card_color", "card_icon"):
+        v = (overrides or {}).get(k)
+        if v is not None and v != "":
+            b[k] = v
+    sample = os.path.join(ROOT, "config", "sample_product.png")
+    img = open(sample, "rb").read() if os.path.exists(sample) else b""
+    return card.build_card(img, "ASUS ROG Strix G16", "FX608JPR-RV019", _SAMPLE_SPECS, b, category="Gaming noutbuk")
+
+
 class H(BaseHTTPRequestHandler):
     def _send(self, code, body, ctype="application/json"):
         if isinstance(body, (dict, list)):
@@ -154,6 +170,18 @@ class H(BaseHTTPRequestHandler):
             k = ai_brand._key()
             return self._send(200, {"ai_key_set": bool(k), "ai_key_masked": (k[:6] + "…" + k[-4:]) if k else None,
                                     "brand": ai_brand.load_brand().get("name")})
+        if path == "/api/brand/get":
+            from radar import ai_brand, card
+            bb = ai_brand.load_brand()
+            return self._send(200, {"name": bb.get("name", "PCTECH"), "phone": bb.get("phone", ""),
+                                    "guarantee": bb.get("guarantee", ""), "card_color": bb.get("card_color", "#2F56E0"),
+                                    "card_icon": bb.get("card_icon", "code"), "has_logo": bool(bb.get("card_logo")),
+                                    "icons": card.IT_ICONS})
+        if path == "/api/brand/preview":
+            try:
+                return self._send(200, _brand_preview(q), "image/jpeg")
+            except Exception as e:
+                return self._send(200, {"error": str(e)[:180]})
         if path == "/api/refresh-status":
             return self._send(200, _REFRESH)
         if path == "/api/auth/whoami":
@@ -206,6 +234,31 @@ class H(BaseHTTPRequestHandler):
                 return self._send(403, {"error": "yalnız admin"})
             from radar import ai_brand
             return self._send(200, ai_brand.set_key(data.get("openai_key", "").strip()))
+        if path == "/api/brand/set":  # kart dizaynı ayarları (ad, nömrə, zəmanət, rəng, ikon)
+            if not is_admin:
+                return self._send(403, {"error": "yalnız admin"})
+            from radar import ai_brand
+            return self._send(200, ai_brand.set_brand(data))
+        if path == "/api/brand/logo":  # öz logonu yüklə → badge əvəzinə
+            if not is_admin:
+                return self._send(403, {"error": "yalnız admin"})
+            b64 = data.get("b64") or ""
+            if not b64[:32].lower().startswith("data:image/"):
+                return self._send(200, {"error": "yalnız şəkil (png/jpg)"})
+            try:
+                raw = base64.b64decode(b64.split(",", 1)[1])
+            except Exception as e:
+                return self._send(200, {"error": f"oxunmadı: {str(e)[:60]}"})
+            open(os.path.join(ROOT, "config", "custom_logo.png"), "wb").write(raw)
+            from radar import ai_brand
+            ai_brand.set_brand({"card_logo": "config/custom_logo.png"})
+            return self._send(200, {"ok": True})
+        if path == "/api/brand/logo-clear":  # logonu sil → IT ikonuna qayıt
+            if not is_admin:
+                return self._send(403, {"error": "yalnız admin"})
+            from radar import ai_brand
+            ai_brand.set_brand({"card_logo": ""})
+            return self._send(200, {"ok": True})
         # rol qapısı — draft/AI əməliyyatları sistem girişi tələb edir (operator+admin)
         if path.startswith("/api/draft/") and not su:
             return self._send(401, {"error": "sistemə giriş lazımdır (login)"})

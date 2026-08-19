@@ -219,13 +219,13 @@ function distinct(field,cat){const s=new Set();DATA.forEach(r=>{if(cat&&r.catego
 const NAV=[['overview','📊 İcmal'],['best','⭐ Ən uyğun'],['new','🆕 Yeni'],['SEP','Kateqoriyalar'],
  ...META.cats.map(c=>['cat:'+c.slug,c.label,c.n]),['SEP','Alətlər'],
  ['analysis','📈 Parametr analizi'],['stars','⭐ Seçilmişlər'],['SEP','İdarəetmə (backend)'],
- ['admin','🛠 Repost / Yenilə'],['settings','⚙️ Tənzimləmələr'],['users','👥 İstifadəçilər']];
+ ['admin','🛠 Repost / Yenilə'],['design','🎨 Kart dizaynı'],['settings','⚙️ Tənzimləmələr'],['users','👥 İstifadəçilər']];
 function buildNav(){
  const n=$('#nav');n.innerHTML='';
  const _isAdm=BACKEND&&BACKEND.sys&&BACKEND.sys.role==='admin';
  NAV.forEach(item=>{
-  if(!BACKEND && (item[0]==='admin'||item[0]==='settings'||item[0]==='users' || item[1]==='İdarəetmə (backend)'))return; // backend yoxdursa gizlət
-  if((item[0]==='settings'||item[0]==='users')&&!_isAdm)return; // yalnız admin girişində
+  if(!BACKEND && (item[0]==='admin'||item[0]==='settings'||item[0]==='users'||item[0]==='design' || item[1]==='İdarəetmə (backend)'))return; // backend yoxdursa gizlət
+  if((item[0]==='settings'||item[0]==='users'||item[0]==='design')&&!_isAdm)return; // yalnız admin girişində
   if(item[0]==='SEP'){const d=document.createElement('div');d.className='sep';d.textContent=item[1];n.appendChild(d);return;}
   const b=document.createElement('button');b.dataset.k=item[0];
   b.innerHTML=`<span>${item[1]}</span>`+(item[2]!=null?`<span class="cnt">${item[2]}</span>`:'');
@@ -762,6 +762,9 @@ function render1(){
  } else if(v==='users'){
   title='👥 İstifadəçilər';sub='giriş və rollar (admin)';
   root.innerHTML=usersView();bindAdmin();
+ } else if(v==='design'){
+  title='🎨 Kart dizaynı';sub='logo · nömrə · rəng · ikon (admin)';
+  root.innerHTML=designView();bindDesign();
  }
  $('#vtitle').textContent=title;$('#vsub').textContent=sub;
 }
@@ -840,6 +843,49 @@ function usersView(){
    <div class="controls"><input id="u_name" placeholder="username" style="width:130px"><input id="u_pw" type="password" placeholder="parol" style="width:130px"><select id="u_role"><option value="operator">operator</option><option value="admin">admin</option></select><button class="chip on" id="u_add">➕ Əlavə et</button></div>
    <div id="u_list" class="muted" style="margin-top:8px">Yüklənir…</div>
    <div class="small muted" style="margin-top:8px"><b>admin</b> = hər şey · <b>operator</b> = yalnız Repost/Yenilə + draft (Tənzimləmələr və İstifadəçilər yox).</div></div>`;
+}
+// ---- 4) Kart dizaynı səhifəsi (Canva kimi sadə redaktor) ----
+function designView(){
+ const gate=_sysGate();if(gate)return gate;
+ if(BACKEND.sys.role!=='admin')return _sysHead()+_adminOnly('Kart dizaynı');
+ return _sysHead()+`<div class="panel"><h2>🎨 Kart dizaynı <span class="small">— dəyiş → canlı önizlə → saxla</span></h2>
+   <div class="grid2" style="gap:20px">
+    <div>
+     <div class="small" style="font-weight:700">Brend adı <span class="muted">(aşağıda görünür)</span></div><input id="bd_name" style="width:100%" placeholder="PCTECH">
+     <div class="small" style="font-weight:700;margin-top:10px">Telefon</div><input id="bd_phone" style="width:100%" placeholder="+994 ...">
+     <div class="small" style="font-weight:700;margin-top:10px">Zəmanət mətni</div><input id="bd_guar" style="width:100%" placeholder="Rəsmi zəmanət">
+     <div class="small" style="font-weight:700;margin-top:10px">Əsas rəng</div><div class="controls"><input type="color" id="bd_color" style="width:56px;height:38px;padding:2px;border:1px solid var(--line);border-radius:8px"><input id="bd_colorhex" style="width:130px" placeholder="#2F56E0"></div>
+     <div class="small" style="font-weight:700;margin-top:10px">Yuxarı-sağ ikon</div><div id="bd_icons" class="controls" style="flex-wrap:wrap;gap:6px;margin-top:2px"></div>
+     <div class="small" style="font-weight:700;margin-top:10px">Öz logon <span class="muted">(ikonu əvəz edir)</span></div>
+     <div class="controls"><label class="chip on" style="cursor:pointer;margin:0">📤 Logo yüklə<input type="file" id="bd_logo" accept="image/*" style="display:none"></label><button class="chip" id="bd_logoclear">🗑 Logonu sil</button></div>
+     <div class="small" id="bd_logomsg" style="margin-top:4px"></div>
+     <div style="margin-top:16px"><button class="chip on" id="bd_save">💾 Saxla</button> <span class="small" id="bd_savemsg"></span></div>
+    </div>
+    <div>
+     <div class="small" style="font-weight:700">Canlı önizləmə</div>
+     <img id="bd_prev" style="width:100%;border:1px solid var(--line);border-radius:12px;margin-top:4px" src="/api/brand/preview">
+     <div class="small muted" style="margin-top:6px">Nümunə məhsul göstərilir. Real kart hər draftın «🟩 Techbar kart» düyməsi ilə yaranır.</div>
+    </div>
+   </div></div>`;
+}
+async function bindDesign(){const g=id=>document.getElementById(id);const J={'Content-Type':'application/json'};
+ if(!g('bd_name'))return;
+ const b=await api('/api/brand/get');
+ g('bd_name').value=b.name||'';g('bd_phone').value=b.phone||'';g('bd_guar').value=b.guarantee||'';
+ g('bd_color').value=b.card_color||'#2F56E0';g('bd_colorhex').value=b.card_color||'#2F56E0';
+ let curIcon=b.card_icon||'code';
+ const labels={chip:'🔲 Çip',monitor:'🖥 Monitor',code:'&lt;/&gt; Kod',laptop:'💻 Laptop',power:'⏻ Power',headset:'🎧 Qulaqlıq',gear:'⚙️ Dişli',cloud:'☁️ Bulud'};
+ const icg=g('bd_icons');
+ icg.innerHTML=(b.icons||[]).map(k=>`<button class="chip${k===curIcon?' on':''}" data-ic="${k}">${labels[k]||k}</button>`).join('');
+ const prev=()=>{const qs=new URLSearchParams({name:g('bd_name').value,phone:g('bd_phone').value,guarantee:g('bd_guar').value,card_color:g('bd_colorhex').value,card_icon:curIcon});g('bd_prev').src='/api/brand/preview?'+qs.toString()+'&t='+Date.now();};
+ icg.querySelectorAll('[data-ic]').forEach(bt=>bt.onclick=()=>{curIcon=bt.dataset.ic;icg.querySelectorAll('[data-ic]').forEach(x=>x.classList.toggle('on',x.dataset.ic===curIcon));prev();});
+ let tmr;const deb=()=>{clearTimeout(tmr);tmr=setTimeout(prev,450);};
+ ['bd_name','bd_phone','bd_guar'].forEach(id=>g(id).oninput=deb);
+ g('bd_color').oninput=()=>{g('bd_colorhex').value=g('bd_color').value;prev();};
+ g('bd_colorhex').oninput=()=>{if(/^#[0-9a-fA-F]{6}$/.test(g('bd_colorhex').value))g('bd_color').value=g('bd_colorhex').value;deb();};
+ g('bd_logoclear').onclick=async()=>{const r=await api('/api/brand/logo-clear',{method:'POST'});g('bd_logomsg').textContent=r.ok?'✅ İkona qayıdıldı':'⚠️ xəta';prev();};
+ g('bd_logo').onchange=async(e)=>{const f=e.target.files[0];if(!f)return;g('bd_logomsg').textContent='Yüklənir…';const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f);});const r=await api('/api/brand/logo',{method:'POST',headers:J,body:JSON.stringify({b64})});g('bd_logomsg').textContent=r.ok?'✅ Logo təyin olundu (ikonu əvəz edir)':('⚠️ '+esc(r.error||''));prev();e.target.value='';};
+ g('bd_save').onclick=async()=>{const r=await api('/api/brand/set',{method:'POST',headers:J,body:JSON.stringify({name:g('bd_name').value,phone:g('bd_phone').value,guarantee:g('bd_guar').value,card_color:g('bd_colorhex').value,card_icon:curIcon})});g('bd_savemsg').innerHTML=r.ok?'✅ Saxlanıldı — bütün yeni kartlara tətbiq olunur':('⚠️ '+esc(JSON.stringify(r).slice(0,120)));};
 }
 function bindAdmin(){const g=id=>document.getElementById(id);const J={'Content-Type':'application/json'};
  if(g('r_now'))g('r_now').onclick=async()=>{const b=g('r_now');b.disabled=true;b.textContent='🔄 Yenilənir…';g('r_msg').innerHTML='🔄 tap.az yenilənir… (bir neçə dəqiqə çəkə bilər)';const r=await api('/api/refresh',{method:'POST',headers:J,body:'{}'});if(r&&r.error){g('r_msg').innerHTML='⚠️ '+esc(JSON.stringify(r).slice(0,200));b.disabled=false;b.textContent='🔄 İndi yenilə';return;}banner('🔄 tap.az məlumatları yenilənir…');setTimeout(pollRefresh,3000);};
