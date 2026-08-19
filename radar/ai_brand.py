@@ -50,7 +50,8 @@ def has_key():
     return bool(_key())
 
 
-_BRAND_EDITABLE = ("name", "phone", "guarantee", "card_color", "card_icon", "card_logo")
+_BRAND_EDITABLE = ("name", "phone", "guarantee", "card_color", "card_icon", "card_logo",
+                   "card_badge", "card_badge_pos")
 
 
 def set_brand(fields):

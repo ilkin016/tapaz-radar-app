@@ -855,7 +855,10 @@ function designView(){
      <div class="small" style="font-weight:700;margin-top:10px">Telefon</div><input id="bd_phone" style="width:100%" placeholder="+994 ...">
      <div class="small" style="font-weight:700;margin-top:10px">Zəmanət mətni</div><input id="bd_guar" style="width:100%" placeholder="Rəsmi zəmanət">
      <div class="small" style="font-weight:700;margin-top:10px">Əsas rəng</div><div class="controls"><input type="color" id="bd_color" style="width:56px;height:38px;padding:2px;border:1px solid var(--line);border-radius:8px"><input id="bd_colorhex" style="width:130px" placeholder="#2F56E0"></div>
-     <div class="small" style="font-weight:700;margin-top:10px">Yuxarı-sağ ikon</div><div id="bd_icons" class="controls" style="flex-wrap:wrap;gap:6px;margin-top:2px"></div>
+     <div class="small" style="font-weight:700;margin-top:10px">Promo yazı <span class="muted">(məs 24 ayadək kredit)</span></div><input id="bd_badge" style="width:100%" placeholder="24 ayadək kredit və taksit">
+     <div class="small" style="font-weight:700;margin-top:8px">Promo mövqe</div>
+     <select id="bd_badgepos" style="width:100%"><option value="none">Yoxdur</option><option value="top-left">Yuxarı sol</option><option value="top-center">Yuxarı mərkəz</option><option value="top-right">Yuxarı sağ</option></select>
+     <div class="small" style="font-weight:700;margin-top:10px">Yuxarı-sağ ikon <span class="muted">(istəsən)</span></div><div id="bd_icons" class="controls" style="flex-wrap:wrap;gap:6px;margin-top:2px"></div>
      <div class="small" style="font-weight:700;margin-top:10px">Öz logon <span class="muted">(ikonu əvəz edir)</span></div>
      <div class="controls"><label class="chip on" style="cursor:pointer;margin:0">📤 Logo yüklə<input type="file" id="bd_logo" accept="image/*" style="display:none"></label><button class="chip" id="bd_logoclear">🗑 Logonu sil</button></div>
      <div class="small" id="bd_logomsg" style="margin-top:4px"></div>
@@ -873,19 +876,21 @@ async function bindDesign(){const g=id=>document.getElementById(id);const J={'Co
  const b=await api('/api/brand/get');
  g('bd_name').value=b.name||'';g('bd_phone').value=b.phone||'';g('bd_guar').value=b.guarantee||'';
  g('bd_color').value=b.card_color||'#2F56E0';g('bd_colorhex').value=b.card_color||'#2F56E0';
- let curIcon=b.card_icon||'code';
- const labels={chip:'🔲 Çip',monitor:'🖥 Monitor',code:'&lt;/&gt; Kod',laptop:'💻 Laptop',power:'⏻ Power',headset:'🎧 Qulaqlıq',gear:'⚙️ Dişli',cloud:'☁️ Bulud'};
+ g('bd_badge').value=b.card_badge||'';g('bd_badgepos').value=b.card_badge_pos||'none';
+ let curIcon=b.card_icon||'none';
+ const labels={none:'🚫 Yoxdur',chip:'🔲 Çip',monitor:'🖥 Monitor',code:'&lt;/&gt; Kod',laptop:'💻 Laptop',power:'⏻ Power',headset:'🎧 Qulaqlıq',gear:'⚙️ Dişli',cloud:'☁️ Bulud'};
  const icg=g('bd_icons');
- icg.innerHTML=(b.icons||[]).map(k=>`<button class="chip${k===curIcon?' on':''}" data-ic="${k}">${labels[k]||k}</button>`).join('');
- const prev=()=>{const qs=new URLSearchParams({name:g('bd_name').value,phone:g('bd_phone').value,guarantee:g('bd_guar').value,card_color:g('bd_colorhex').value,card_icon:curIcon});g('bd_prev').src='/api/brand/preview?'+qs.toString()+'&t='+Date.now();};
+ icg.innerHTML=['none'].concat(b.icons||[]).map(k=>`<button class="chip${k===curIcon?' on':''}" data-ic="${k}">${labels[k]||k}</button>`).join('');
+ const prev=()=>{const qs=new URLSearchParams({name:g('bd_name').value,phone:g('bd_phone').value,guarantee:g('bd_guar').value,card_color:g('bd_colorhex').value,card_icon:curIcon,card_badge:g('bd_badge').value,card_badge_pos:g('bd_badgepos').value});g('bd_prev').src='/api/brand/preview?'+qs.toString()+'&t='+Date.now();};
  icg.querySelectorAll('[data-ic]').forEach(bt=>bt.onclick=()=>{curIcon=bt.dataset.ic;icg.querySelectorAll('[data-ic]').forEach(x=>x.classList.toggle('on',x.dataset.ic===curIcon));prev();});
  let tmr;const deb=()=>{clearTimeout(tmr);tmr=setTimeout(prev,450);};
- ['bd_name','bd_phone','bd_guar'].forEach(id=>g(id).oninput=deb);
+ ['bd_name','bd_phone','bd_guar','bd_badge'].forEach(id=>g(id).oninput=deb);
+ g('bd_badgepos').onchange=prev;
  g('bd_color').oninput=()=>{g('bd_colorhex').value=g('bd_color').value;prev();};
  g('bd_colorhex').oninput=()=>{if(/^#[0-9a-fA-F]{6}$/.test(g('bd_colorhex').value))g('bd_color').value=g('bd_colorhex').value;deb();};
  g('bd_logoclear').onclick=async()=>{const r=await api('/api/brand/logo-clear',{method:'POST'});g('bd_logomsg').textContent=r.ok?'✅ İkona qayıdıldı':'⚠️ xəta';prev();};
  g('bd_logo').onchange=async(e)=>{const f=e.target.files[0];if(!f)return;g('bd_logomsg').textContent='Yüklənir…';const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f);});const r=await api('/api/brand/logo',{method:'POST',headers:J,body:JSON.stringify({b64})});g('bd_logomsg').textContent=r.ok?'✅ Logo təyin olundu (ikonu əvəz edir)':('⚠️ '+esc(r.error||''));prev();e.target.value='';};
- g('bd_save').onclick=async()=>{const r=await api('/api/brand/set',{method:'POST',headers:J,body:JSON.stringify({name:g('bd_name').value,phone:g('bd_phone').value,guarantee:g('bd_guar').value,card_color:g('bd_colorhex').value,card_icon:curIcon})});g('bd_savemsg').innerHTML=r.ok?'✅ Saxlanıldı — bütün yeni kartlara tətbiq olunur':('⚠️ '+esc(JSON.stringify(r).slice(0,120)));};
+ g('bd_save').onclick=async()=>{const r=await api('/api/brand/set',{method:'POST',headers:J,body:JSON.stringify({name:g('bd_name').value,phone:g('bd_phone').value,guarantee:g('bd_guar').value,card_color:g('bd_colorhex').value,card_icon:curIcon,card_badge:g('bd_badge').value,card_badge_pos:g('bd_badgepos').value})});g('bd_savemsg').innerHTML=r.ok?'✅ Saxlanıldı — bütün yeni kartlara tətbiq olunur':('⚠️ '+esc(JSON.stringify(r).slice(0,120)));};
 }
 function bindAdmin(){const g=id=>document.getElementById(id);const J={'Content-Type':'application/json'};
  if(g('r_now'))g('r_now').onclick=async()=>{const b=g('r_now');b.disabled=true;b.textContent='🔄 Yenilənir…';g('r_msg').innerHTML='🔄 tap.az yenilənir… (bir neçə dəqiqə çəkə bilər)';const r=await api('/api/refresh',{method:'POST',headers:J,body:'{}'});if(r&&r.error){g('r_msg').innerHTML='⚠️ '+esc(JSON.stringify(r).slice(0,200));b.disabled=false;b.textContent='🔄 İndi yenilə';return;}banner('🔄 tap.az məlumatları yenilənir…');setTimeout(pollRefresh,3000);};

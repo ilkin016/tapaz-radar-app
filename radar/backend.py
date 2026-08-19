@@ -93,9 +93,9 @@ def _brand_preview(overrides):
     """Nümunə kartı cari brend + (query) override-larla render et → JPEG bytes."""
     from radar import ai_brand, card
     b = dict(ai_brand.load_brand())
-    for k in ("name", "phone", "guarantee", "card_color", "card_icon"):
+    for k in ("name", "phone", "guarantee", "card_color", "card_icon", "card_badge", "card_badge_pos"):
         v = (overrides or {}).get(k)
-        if v is not None and v != "":
+        if v is not None:
             b[k] = v
     sample = os.path.join(ROOT, "config", "sample_product.png")
     img = open(sample, "rb").read() if os.path.exists(sample) else b""
@@ -175,7 +175,8 @@ class H(BaseHTTPRequestHandler):
             bb = ai_brand.load_brand()
             return self._send(200, {"name": bb.get("name", "PCTECH"), "phone": bb.get("phone", ""),
                                     "guarantee": bb.get("guarantee", ""), "card_color": bb.get("card_color", "#2F56E0"),
-                                    "card_icon": bb.get("card_icon", "code"), "has_logo": bool(bb.get("card_logo")),
+                                    "card_icon": bb.get("card_icon", "none"), "has_logo": bool(bb.get("card_logo")),
+                                    "card_badge": bb.get("card_badge", ""), "card_badge_pos": bb.get("card_badge_pos", "none"),
                                     "icons": card.IT_ICONS})
         if path == "/api/brand/preview":
             try:

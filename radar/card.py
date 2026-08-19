@@ -187,6 +187,18 @@ def _it_glyph(d, kind, cx, cy, s, color):
         _chip_badge(d, cx, cy, s, color)
 
 
+def _promo_badge(d, text, pos, W, H, pad, inl, inr, color):
+    """Promo pill (məs '24 ayadək kredit və taksit') — mövqe: top-left/top-center/top-right."""
+    f = _font(int(H * 0.026), bold=True)
+    padx = int(W * 0.016); h = int(H * 0.052)
+    tw = d.textlength(text, font=f); w = int(tw + 2 * padx)
+    y = pad + int(H * 0.035)
+    x = inr - w if pos == "top-right" else (int((W - w) / 2) if pos == "top-center" else inl)
+    d.rounded_rectangle([x, y, x + w, y + h], radius=int(h / 2), fill=color)
+    tb = d.textbbox((0, 0), text, font=f)
+    d.text((x + padx, y + (h - (tb[3] - tb[1])) / 2 - tb[1]), text, font=f, fill="white")
+
+
 def build_card(product_img_bytes, title, model="", features=None, brand=None, size=None, category=""):
     """Sadə ağ fon + çərçivə: PCTECH məhsul kartı → JPEG bytes."""
     b = brand or {}
@@ -205,7 +217,7 @@ def build_card(product_img_bytes, title, model="", features=None, brand=None, si
     inl = pad + int(W * 0.028)   # daxili sol
     inr = W - pad - int(W * 0.028)
 
-    # ---- yuxarı-sağ: yüklənmiş logo VƏ YA seçilmiş IT ikonu (mavi badge) ----
+    # ---- yuxarı: yüklənmiş logo / IT ikon (card_icon != none) ----
     clogo = b.get("card_logo")
     clogo_path = os.path.join(ROOT, clogo) if clogo else ""
     used_logo = False
@@ -215,11 +227,16 @@ def build_card(product_img_bytes, title, model="", features=None, brand=None, si
             canvas.paste(lg, (inr - lg.width, pad + int(H * 0.04)), lg); used_logo = True
         except Exception:
             used_logo = False
-    if not used_logo:
+    icon = b.get("card_icon", "none")
+    if not used_logo and icon and icon != "none":
         bsz = int(H * 0.085)
         bx, by = inr - bsz, pad + int(H * 0.045)
         d.rounded_rectangle([bx, by, bx + bsz, by + bsz], radius=int(bsz * 0.24), fill=blue)
-        _it_glyph(d, b.get("card_icon", "code"), bx + bsz / 2, by + bsz / 2, bsz * 0.26, (255, 255, 255))
+        _it_glyph(d, icon, bx + bsz / 2, by + bsz / 2, bsz * 0.26, (255, 255, 255))
+    # ---- promo badge (24 ayadək kredit və taksit) — mövqe dəyişilə bilər ----
+    promo = b.get("card_badge", ""); ppos = b.get("card_badge_pos", "none")
+    if promo and ppos != "none":
+        _promo_badge(d, promo, ppos, W, H, pad, inl, inr, blue)
 
     # ---- sol: məhsul (təmiz ağ fonda, kəsilmədən) ----
     bx0, by0, bx1, by1 = inl, int(H * 0.17), int(W * 0.50), int(H * 0.82)
@@ -229,30 +246,33 @@ def build_card(product_img_bytes, title, model="", features=None, brand=None, si
     except Exception:
         pass
 
-    # ---- sağ: kateqoriya + başlıq + model + xüsusiyyətlər ----
-    rx = int(W * 0.55)
-    rmax = inr - rx
-    y = int(H * 0.19)
+    # ---- sağ: kateqoriya + başlıq + model + xüsusiyyət (KOMPAKT, şaquli mərkəz) ----
+    rx = int(W * 0.55); rmax = inr - rx
+    fnt_title = _font(int(H * 0.05), bold=True)
+    tlines = _wrap(d, title, fnt_title, rmax)
+    n = max(1, len(features))
+    row_h = int(H * 0.086)                       # kompakt sabit aralıq
+    ir = int(H * 0.027) if n >= 4 else int(H * 0.030)
+    fnt_feat = _font(int(H * 0.027) if n >= 4 else int(H * 0.031), bold=True)
+    # blok hündürlüyünü ölç → bütün sağ blok şaquli mərkəzdə
+    blk = (int(H * 0.045) if category else 0) + len(tlines) * int(H * 0.058)
+    blk += (int(H * 0.004) + int(H * 0.05)) if model else int(H * 0.012)
+    blk += int(H * 0.038) + n * row_h
+    top_a, bot_a = pad + int(H * 0.07), H - pad - int(H * 0.085)
+    y = int(top_a + max(0, (bot_a - top_a - blk) / 2))
     if category:
         d.text((rx, y), category.upper(), font=_font(int(H * 0.024), bold=True), fill=blue); y += int(H * 0.045)
-    fnt_title = _font(int(H * 0.05), bold=True)
-    for ln in _wrap(d, title, fnt_title, rmax):
+    for ln in tlines:
         d.text((rx, y), ln, font=fnt_title, fill=ink); y += int(H * 0.058)
     if model:
         y += int(H * 0.004)
         d.text((rx, y), model, font=_font(int(H * 0.03), bold=True), fill=(120, 130, 150)); y += int(H * 0.05)
     else:
         y += int(H * 0.012)
-    d.line([rx, y, inr, y], fill=(226, 231, 241), width=3); y += int(H * 0.04)
-    # 3-5 parametr — mövcud hündürlüyə görə adaptiv aralıq
-    n = max(1, len(features))
-    ft_top, ft_bot = y, H - pad - int(H * 0.095)
-    row_h = min((ft_bot - ft_top) / n, H * 0.115)
-    ir = int(H * 0.027) if n >= 4 else int(H * 0.030)
-    fnt_feat = _font(int(H * 0.027) if n >= 4 else int(H * 0.031), bold=True)
+    d.line([rx, y, inr, y], fill=(226, 231, 241), width=3); y += int(H * 0.038)
     tx = rx + 2 * ir + int(W * 0.016)
     for i, f in enumerate(features):
-        cy = int(ft_top + row_h * i + row_h / 2)
+        cy = int(y + row_h * i + row_h / 2)
         d.ellipse([rx, cy - ir, rx + 2 * ir, cy + ir], fill=(238, 242, 252))
         _draw_glyph(d, _icon_kind(f), rx + ir, cy, int(ir * 0.82), blue)
         tb = d.textbbox((0, 0), f, font=fnt_feat)

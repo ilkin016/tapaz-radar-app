@@ -3,15 +3,25 @@
   "tagline": "Etibarlı texnologiya mağazası",
   "voice": "Sadə, korporativ, peşəkar, etibarlı, texnoloji. Qısa aydın cümlələr. Emoji minimal.",
   "text_instructions": "Bu elanı Techbar mağazasının brendinə uyğun yenidən yaz. Ton: peşəkar, təmiz, korporativ, etibarlı. Məhsulun BÜTÜN texniki xüsusiyyətlərini (model, CPU, RAM, yaddaş, ekran, video kart və s.) DƏQİQ saxla — heç nə uydurma. Başqa satıcının telefon nömrələrini, adını, sosial media/sayt linklərini ÇIXAR. Sonunda qısa Techbar zəmanət/xidmət qeydi əlavə et. Azərbaycan dilində. Başlığı da Techbar stilində, qısa və aydın et.",
-  "colors": { "primary": "#2F56E0", "accent": "#2F56E0", "bg": "#FFFFFF", "text": "#1A2233" },
+  "colors": {
+    "primary": "#2F56E0",
+    "accent": "#2F56E0",
+    "bg": "#FFFFFF",
+    "text": "#1A2233"
+  },
   "card_color": "#2F56E0",
-  "card_size": [1600, 1200],
+  "card_size": [
+    1600,
+    1200
+  ],
   "logo_file": "config/pctech_logo.png",
   "website": "techbar.az",
   "phone": "+994 50 499 66 56",
   "guarantee": "Rəsmi zəmanət",
-  "card_icon": "code",
+  "card_icon": "none",
   "card_logo": "",
+  "card_badge": "24 ayadək kredit və taksit",
+  "card_badge_pos": "top-left",
   "image_style": "clean minimal corporate e-commerce product photo, unified consistent design, soft studio lighting, pure white to light-blue gradient background, subtle deep-blue (#0B3D91) and cyan (#00A3E0) brand accents, centered product, professional catalog style, high detail, no text, no watermark, no logos of other brands",
   "brandify_prompt": "Take the product shown in this photo and present it as a clean professional e-commerce catalog image. CRITICAL: keep the EXACT same product — identical model, colour, ports, keyboard, screen content, proportions and viewing angle. Do NOT redraw, replace, restyle or invent any part of the product itself. Only replace the background and improve presentation: pure white to soft light-blue gradient background, gentle realistic soft shadow under the product, clean soft studio lighting, generous empty space, modern minimal corporate look with subtle deep-blue (#0B3D91) / cyan (#00A3E0) accent. No text, no watermark, no logos.",
   "image_provider": "openai",
