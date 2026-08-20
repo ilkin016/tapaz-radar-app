@@ -959,7 +959,7 @@ async function loadStoreProducts(reset){const grid=document.getElementById('st_g
     <div class="zm">🔍 bax</div>
     <div class="iw" data-prev="${p.id}">${p.photo?`<img src="${esc(p.photo)}">`:''}</div>
     <div class="stbody"><div class="t" data-prev="${p.id}" title="${esc(p.title||'')}">${esc((p.title||'').slice(0,62))}</div>
-     <div class="stspecs">${specTags(p.title).map(s=>`<span>${esc(s)}</span>`).join('')}</div>
+     <div class="stspecs" data-specid="${p.id}">${((p.specs&&p.specs.length)?p.specs:specTags(p.title)).map(s=>`<span>${esc(s)}</span>`).join('')}</div>
      <div class="p">${p.price||0} ₼</div>
      <div style="margin-top:7px">${p.already?'<span class="small" style="color:var(--good);font-weight:700">✓ sistemdə</span>':`<button class="chip on" data-imp="${p.id}" style="width:100%;font-size:11.5px;padding:5px">📥 PCTECH-ə</button>`}</div></div>`;
    grid.appendChild(card);});
@@ -967,6 +967,8 @@ async function loadStoreProducts(reset){const grid=document.getElementById('st_g
  grid.querySelectorAll('[data-imp]').forEach(b=>{if(b._b)return;b._b=1;b.onclick=async()=>{b.textContent='⏳…';b.disabled=true;const r=await api('/api/stores/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({listing_id:b.dataset.imp})});if(r.ok){b.textContent='✓ əlavə';b.style.background='var(--good)';}else{b.textContent='⚠️';b.disabled=false;}};});
  grid.querySelectorAll('.st_ck').forEach(c=>{if(c._b)return;c._b=1;c.onchange=updStSel;});
  STOFF+=(r.items||[]).length;const mb=document.getElementById('st_more');if(mb)mb.style.display=(STOFF<STTOTAL)?'inline-block':'none';
+ const need=(r.items||[]).filter(p=>!(p.specs&&p.specs.length)).map(p=>p.id);
+ if(need.length)api('/api/stores/enrich',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:STCUR,ids:need})}).then(er=>{if(er&&er.specs)Object.entries(er.specs).forEach(([id,sp])=>{const el=grid.querySelector('.stspecs[data-specid="'+id+'"]');if(el&&sp&&sp.length)el.innerHTML=sp.map(s=>'<span>'+esc(s)+'</span>').join('');});});
  updStSel();}
 async function openStorePreview(id){let ov=document.getElementById('stprev');
  if(!ov){ov=document.createElement('div');ov.id='stprev';ov.style.cssText='position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:20px';document.body.appendChild(ov);ov.onclick=e=>{if(e.target===ov)ov.style.display='none';};}

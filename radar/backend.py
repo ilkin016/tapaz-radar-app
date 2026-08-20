@@ -403,6 +403,23 @@ class H(BaseHTTPRequestHandler):
             if _REFRESH["running"]:
                 return self._send(200, {"error": "Skan gedir — bitəndən sonra"})
             return self._send(200, _import_one(data.get("listing_id")))
+        if path == "/api/stores/enrich":  # görünən məhsulların əsas parametrlərini detaldan çək + keşlə
+            if _REFRESH["running"]:
+                return self._send(200, {"specs": {}})
+            slug = data.get("slug", "")
+            ids = [str(i) for i in (data.get("ids") or [])][:24]
+            miss = _STORES.missing_specs(slug, ids)
+            from radar.stores import specs_from_ad
+            out = {}
+            for lid in miss:
+                try:
+                    ad = poster.read_ad_for_repost(lid)
+                    sp = specs_from_ad(ad) if not ad.get("error") else []
+                except Exception:
+                    sp = []
+                _STORES.set_specs(slug, lid, sp)  # boş olsa da yaz (təkrar cəhd etməmək üçün)
+                out[lid] = sp
+            return self._send(200, {"specs": out})
         if path == "/api/stores/import-bulk":  # seçilmiş məhsulları toplu → draft (arxa fon)
             if _REFRESH["running"]:
                 return self._send(200, {"error": "Skan gedir — bitəndən sonra"})

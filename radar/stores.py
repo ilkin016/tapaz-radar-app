@@ -3,7 +3,7 @@
 birbaşa PCTECH-ə (draft) əlavə et.
 Mexanizm: shop(slug){ user{ legacyId } } → adSearch(filters:{userLegacyId}){ ...category ...photo }.
 Sync = bütün məhsulları çək → store_products keşinə yaz (kateqoriya + şəkil). Gündəlik + əl ilə."""
-import sqlite3, os, re, time
+import sqlite3, os, re, time, json
 from radar import tap
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -25,6 +25,31 @@ CREATE TABLE IF NOT EXISTS store_products(
 CREATE INDEX IF NOT EXISTS ix_sp_store ON store_products(store_slug);
 CREATE INDEX IF NOT EXISTS ix_sp_cat ON store_products(store_slug, category_id);
 """
+
+
+def specs_from_ad(ad):
+    """Elan body-sindən əsas parametrləri çıxar (CPU/GPU/RAM/SSD/ekran) — mağazadan asılı olmayan çevik parser."""
+    b = (ad.get("body") or "").replace("®", "").replace("™", "").replace("🔹", "").replace("🔸", "")
+    lines = [l.strip(" -•*\t") for l in b.split("\n") if l.strip()]
+
+    def find(labels):
+        for l in lines:
+            for lab in labels:
+                m = re.match(lab + r"[\s:：\-]+(.+)", l, re.I)
+                if m and m.group(1).strip():
+                    v = re.sub(r"\s+", " ", m.group(1).strip())
+                    v = re.split(r"[,(]", v)[0].strip()
+                    if v and v.lower() not in ("yoxdur", "xeyr", "yox", "var", "bəli", "integrated"):
+                        return v
+        return None
+    cpu = find([r"CPU", r"Prosessor növü", r"Prosessor kodu", r"Prosessor", r"İşlemci"])
+    gpu = find([r"Videokart", r"Video kart modeli", r"Video kart", r"GPU", r"Ekran kartı"])
+    ram = find([r"RAM tutumu", r"RAM", r"Operativ yaddaş"])
+    ssd = find([r"SSD", r"Saxlama tutumu", r"Daxili yaddaş", r"Yaddaş tutumu"])
+    scr = find([r"LCD", r"Ekran diaqonalı düymlərlə", r"Ekran ölçüsü", r"Ekran diaqonalı", r"Display"])
+    if scr and re.fullmatch(r"\d{2}(\.\d)?", scr):
+        scr = scr + '"'
+    return [v[:24] for v in (cpu, gpu, ram, ssd, scr) if v][:5]
 
 
 def slug_of(url_or_slug):
@@ -81,10 +106,11 @@ class StoreStore:
         self.db = sqlite3.connect(DB, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(_SCHEMA)
-        try:  # köhnə stores cədvəlinə last_sync əlavə et
-            self.db.execute("ALTER TABLE stores ADD COLUMN last_sync TEXT")
-        except sqlite3.OperationalError:
-            pass
+        for tbl, col, typ in [("stores", "last_sync", "TEXT"), ("store_products", "specs", "TEXT")]:
+            try:
+                self.db.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} {typ}")
+            except sqlite3.OperationalError:
+                pass
         self.db.commit()
 
     def add(self, url_or_slug):
@@ -128,11 +154,14 @@ class StoreStore:
             return {"error": "mağaza yoxdur"}
         items = _fetch_all(st["user_legacy_id"], log=log)
         now = time.strftime("%Y-%m-%d %H:%M")
+        old_specs = {r["listing_id"]: r["specs"] for r in
+                     self.db.execute("SELECT listing_id, specs FROM store_products WHERE store_slug=?", (slug,))}
         self.db.execute("DELETE FROM store_products WHERE store_slug=?", (slug,))
         self.db.executemany(
-            "INSERT OR REPLACE INTO store_products(store_slug,listing_id,title,price,photo,category,category_id,synced_at) "
-            "VALUES(?,?,?,?,?,?,?,?)",
-            [(slug, it["id"], it["title"], it["price"], it["photo"], it["category"], it["category_id"], now) for it in items])
+            "INSERT OR REPLACE INTO store_products(store_slug,listing_id,title,price,photo,category,category_id,synced_at,specs) "
+            "VALUES(?,?,?,?,?,?,?,?,?)",
+            [(slug, it["id"], it["title"], it["price"], it["photo"], it["category"], it["category_id"], now,
+              old_specs.get(it["id"])) for it in items])  # mövcud specs-i saxla (təkrar çəkmə)
         self.db.execute("UPDATE stores SET last_sync=?, ads_count=? WHERE slug=?", (now, len(items), slug))
         self.db.commit()
         return {"ok": True, "count": len(items), "last_sync": now}
@@ -150,9 +179,24 @@ class StoreStore:
             where += " AND category_id=?"; args.append(category)
         total = self.db.execute(f"SELECT COUNT(*) c FROM store_products WHERE {where}", args).fetchone()["c"]
         rows = self.db.execute(
-            f"SELECT listing_id,title,price,photo,category FROM store_products WHERE {where} "
+            f"SELECT listing_id,title,price,photo,category,specs FROM store_products WHERE {where} "
             "ORDER BY CAST(listing_id AS INTEGER) DESC LIMIT ? OFFSET ?", args + [limit, offset]).fetchall()
-        items = [{"id": r["listing_id"], "title": r["title"], "price": r["price"],
-                  "photo": r["photo"], "category": r["category"]} for r in rows]
+        items = [{"id": r["listing_id"], "title": r["title"], "price": r["price"], "photo": r["photo"],
+                  "category": r["category"], "specs": (json.loads(r["specs"]) if r["specs"] else None)} for r in rows]
         return {"items": items, "total": total, "offset": offset, "limit": limit,
                 "has_next": offset + len(items) < total}
+
+    def set_specs(self, slug, listing_id, specs):
+        self.db.execute("UPDATE store_products SET specs=? WHERE store_slug=? AND listing_id=?",
+                        (json.dumps(specs, ensure_ascii=False), slug, str(listing_id)))
+        self.db.commit()
+
+    def missing_specs(self, slug, ids):
+        ids = [str(i) for i in ids if str(i).strip()]
+        if not ids:
+            return []
+        ph = ",".join("?" * len(ids))
+        rows = self.db.execute(
+            f"SELECT listing_id FROM store_products WHERE store_slug=? AND (specs IS NULL OR specs='') "
+            f"AND listing_id IN ({ph})", [slug] + ids).fetchall()
+        return [r["listing_id"] for r in rows]
