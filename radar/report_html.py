@@ -142,13 +142,13 @@ a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
 .catcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px}
 .catcard{background:linear-gradient(160deg,var(--acc-soft),var(--panel));border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;transition:transform .12s,border-color .12s,box-shadow .12s}
 .catcard:hover{border-color:var(--acc2);transform:translateY(-3px);box-shadow:0 10px 24px rgba(37,99,235,.16)}.catcard .b{font-size:25px;font-weight:800;margin:5px 0;letter-spacing:-.5px}
-.stpill{display:inline-flex;align-items:center;gap:9px;background:var(--panel2);border:1.5px solid var(--line);border-radius:13px;padding:8px 13px;cursor:pointer;transition:all .12s;font-weight:600;font-size:13.5px}
-.stpill:hover{border-color:var(--acc2);transform:translateY(-1px)}
-.stpill.on{border-color:var(--acc2);background:var(--acc-soft);box-shadow:0 0 0 3px rgba(47,86,224,.12)}
-.stpill img{width:28px;height:28px;border-radius:50%;object-fit:cover;background:#fff;flex-shrink:0}
-.stpill .cnt{background:var(--chip);border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700}
-.stpill .rm{opacity:.35;font-size:13px;padding:0 2px;transition:opacity .12s}
-.stpill:hover .rm{opacity:.75}
+.stpill{display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:4px 9px;cursor:pointer;transition:border-color .12s;font-weight:600;font-size:12px;line-height:1}
+.stpill:hover{border-color:var(--acc2)}
+.stpill.on{border-color:var(--acc2);background:var(--acc-soft);box-shadow:0 0 0 2px rgba(47,86,224,.1)}
+.stpill img{width:20px;height:20px;border-radius:50%;object-fit:cover;background:#fff;flex-shrink:0}
+.stpill .cnt{background:var(--chip);border-radius:20px;padding:0 6px;font-size:10px;font-weight:700}
+.stpill .rm{opacity:.3;font-size:11px;padding:0 1px;transition:opacity .12s}
+.stpill:hover .rm{opacity:.7}
 .stcat{background:var(--panel2);border:1px solid var(--line);border-radius:22px;padding:6px 14px;cursor:pointer;font-size:12.5px;font-weight:600;transition:all .1s;white-space:nowrap}
 .stcat:hover{border-color:var(--acc2)}
 .stcat.on{background:var(--acc2);border-color:var(--acc2);color:#fff}
@@ -162,7 +162,9 @@ a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
 .stcard:hover .zm{opacity:1}
 .stbody{padding:9px 11px}
 .stbody .t{font-weight:700;line-height:1.25;height:34px;overflow:hidden;font-size:13px;cursor:pointer}
-.stbody .p{font-weight:800;color:var(--acc2);margin-top:3px;font-size:15px}
+.stbody .p{font-weight:800;color:var(--acc2);margin-top:4px;font-size:15px}
+.stspecs{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;min-height:18px}
+.stspecs span{background:var(--acc-soft);color:var(--acc2);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;white-space:nowrap}
 .muted{color:var(--muted)}.hide{display:none}
 .count{color:var(--muted);font-weight:400;font-size:12px}
 .pager{display:flex;gap:5px;align-items:center;flex-wrap:wrap;padding:12px 2px 2px}
@@ -943,6 +945,9 @@ async function openStore(slug){STCUR=slug;STCAT='all';STOFF=0;const p=document.g
 async function loadStoreCats(){const el=document.getElementById('st_cats');if(!el)return;const r=await api('/api/stores/categories?slug='+encodeURIComponent(STCUR));const cats=r.cats||[];
  el.innerHTML=`<div class="stcat${STCAT==='all'?' on':''}" data-cat="all">Hamısı <span class="cnt">${r.total||0}</span></div>`+cats.map(c=>`<div class="stcat${STCAT===c.id?' on':''}" data-cat="${esc(c.id)}">${esc(c.name||'—')} <span class="cnt">${c.count}</span></div>`).join('');
  el.querySelectorAll('[data-cat]').forEach(b=>b.onclick=()=>{STCAT=b.dataset.cat;el.querySelectorAll('[data-cat]').forEach(x=>x.classList.toggle('on',x.dataset.cat===STCAT));loadStoreProducts(true);});}
+function specTags(title){const t=title||'';const out=[];const pats=[/\bRTX\s?\d{3,4}\s?(Ti|Super)?\b/i,/\bGTX\s?\d{3,4}\b/i,/\bRX\s?\d{3,4}\s?(XT)?\b/i,/\b(Core\s?i[3579]|Ryzen\s?[3579]|Ultra\s?[3579])[\s-]?\d{3,5}\w*/i,/\b\d{2,3}\s?Hz\b/i,/\b(FHD|QHD|UWQHD|WQHD|UHD|4K|2K|OLED)\b/i,/\b(IPS|VA|TN)\b/i,/\b\d{2,4}\s?(GB|TB)\b/i,/\bDDR\d\w*/i,/\b(NVMe|M\.?2)\b/i,/\b\d{2}(\.\d)?["]\b/,/\bDDR\d\b/i];
+ for(const p of pats){const m=t.match(p);if(m){const v=m[0].trim();if(!out.some(x=>x.toLowerCase()===v.toLowerCase()))out.push(v);}if(out.length>=4)break;}
+ return out;}
 async function loadStoreProducts(reset){const grid=document.getElementById('st_grid');if(!grid)return;if(reset){STOFF=0;grid.innerHTML='<span class="muted">Yüklənir…</span>';}
  const r=await api('/api/stores/products?slug='+encodeURIComponent(STCUR)+'&category='+encodeURIComponent(STCAT)+'&offset='+STOFF+'&limit=24');
  if(r.error){grid.innerHTML='<span class="muted">⚠️ '+esc(r.error)+'</span>';return;}
@@ -954,6 +959,7 @@ async function loadStoreProducts(reset){const grid=document.getElementById('st_g
     <div class="zm">🔍 bax</div>
     <div class="iw" data-prev="${p.id}">${p.photo?`<img src="${esc(p.photo)}">`:''}</div>
     <div class="stbody"><div class="t" data-prev="${p.id}" title="${esc(p.title||'')}">${esc((p.title||'').slice(0,62))}</div>
+     <div class="stspecs">${specTags(p.title).map(s=>`<span>${esc(s)}</span>`).join('')}</div>
      <div class="p">${p.price||0} ₼</div>
      <div style="margin-top:7px">${p.already?'<span class="small" style="color:var(--good);font-weight:700">✓ sistemdə</span>':`<button class="chip on" data-imp="${p.id}" style="width:100%;font-size:11.5px;padding:5px">📥 PCTECH-ə</button>`}</div></div>`;
    grid.appendChild(card);});
